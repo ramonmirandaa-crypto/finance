@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
 import { cn } from '@/react-app/utils';
 
 const Card = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -22,7 +22,10 @@ const CardHeader = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
 );
 CardHeader.displayName = 'CardHeader';
 
-const CardTitle = forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+type CardTitleRef = ElementRef<'h3'>;
+type CardTitleProps = ComponentPropsWithoutRef<'h3'>;
+
+const CardTitle = forwardRef<CardTitleRef, CardTitleProps>(
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
