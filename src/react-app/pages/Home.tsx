@@ -17,6 +17,7 @@ import TransactionManager from '@/react-app/components/TransactionManager';
 import TransactionCategoryManager from '@/react-app/components/TransactionCategoryManager';
 import AuthButton from '@/react-app/components/AuthButton';
 import LoginPrompt from '@/react-app/components/LoginPrompt';
+import { formatCurrency } from '@/react-app/utils';
 import { Expense, CreateExpense } from '@/shared/types';
 
 type ActiveSection = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'banking' | 'credit-cards' | 'investments' | 'loans' | 'insights' | 'analytics' | 'notifications' | 'quick-actions';
@@ -218,7 +219,7 @@ export default function Home() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total em Gastos</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R${totalExpenses.toFixed(2)}
+                    {formatCurrency(totalExpenses)}
                   </p>
                 </div>
               </div>
@@ -232,7 +233,7 @@ export default function Home() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Este Mês</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R${thisMonthExpenses.toFixed(2)}
+                    {formatCurrency(thisMonthExpenses)}
                   </p>
                 </div>
               </div>
@@ -246,7 +247,7 @@ export default function Home() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Média por Gasto</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R${avgDailySpending.toFixed(2)}
+                    {formatCurrency(avgDailySpending)}
                   </p>
                 </div>
               </div>
