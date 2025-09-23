@@ -109,6 +109,42 @@ const withAccountMetadata = <T extends { account?: { name?: string | null; accou
 const formatTransaction = (transaction: unknown) =>
   normalizePrismaValue(withAccountMetadata(transaction as Record<string, unknown>));
 
+const formatExpenseRecord = (expense: unknown): Record<string, unknown> | null => {
+  if (!expense || typeof expense !== 'object') {
+    return null;
+  }
+
+  const formatted = { ...(expense as Record<string, unknown>) };
+
+  if ('id' in formatted) {
+    const idValue = formatted.id;
+    if (typeof idValue === 'string' || typeof idValue === 'number' || typeof idValue === 'bigint') {
+      formatted.id = Number(idValue);
+    }
+  }
+
+  if ('amount' in formatted) {
+    const amountValue = formatted.amount;
+    if (typeof amountValue === 'string' || typeof amountValue === 'number' || typeof amountValue === 'bigint') {
+      formatted.amount = Number(amountValue);
+    }
+  }
+
+  if ('is_synced_from_bank' in formatted) {
+    const isSyncedValue = formatted.is_synced_from_bank;
+    if (typeof isSyncedValue === 'number') {
+      formatted.is_synced_from_bank = isSyncedValue === 1;
+    } else if (typeof isSyncedValue === 'string') {
+      formatted.is_synced_from_bank =
+        isSyncedValue === '1' || isSyncedValue.toLowerCase() === 'true';
+    } else {
+      formatted.is_synced_from_bank = Boolean(isSyncedValue);
+    }
+  }
+
+  return formatted;
+};
+
 const formatBudget = (budget: unknown) => {
   const normalized = normalizePrismaValue(budget as Record<string, unknown>) as Record<string, unknown>;
   if ('account' in normalized) {
@@ -158,14 +194,45 @@ app.post('/api/expenses', authMiddleware, zValidator('json', expenseSchema), asy
     `);
     
     const result = await stmt.bind(amount, description, category, date, userId).run();
-    
+
     if (!result.success) {
       return errorResponse('Failed to create expense', 500);
     }
 
-    return Response.json({ 
-      id: result.meta.last_row_id,
-      message: 'Expense created successfully' 
+    let expenseRecord: Record<string, unknown> | null = null;
+
+    const insertedExpenseId = result.meta?.last_row_id;
+
+    if (insertedExpenseId !== undefined) {
+      try {
+        const selectStmt = c.env.DB.prepare("SELECT * FROM expenses WHERE id = ? AND user_id = ?");
+        const fetchedExpense = await selectStmt.bind(insertedExpenseId, userId).first();
+        if (fetchedExpense) {
+          const formattedExpense = formatExpenseRecord(fetchedExpense);
+          if (formattedExpense) {
+            expenseRecord = formattedExpense;
+          }
+        }
+      } catch (fetchError) {
+        console.error('Error fetching created expense:', fetchError);
+      }
+    }
+
+    const defaultExpenseData: Record<string, unknown> = {
+      ...(insertedExpenseId !== undefined ? { id: insertedExpenseId } : { id: null }),
+      amount,
+      description,
+      category,
+      date,
+      user_id: userId,
+    };
+
+    const fallbackExpense: Record<string, unknown> =
+      expenseRecord ?? formatExpenseRecord(defaultExpenseData) ?? defaultExpenseData;
+
+    return Response.json({
+      expense: fallbackExpense,
+      message: 'Expense created successfully',
     });
   } catch (error) {
     console.error('Error creating expense:', error);
