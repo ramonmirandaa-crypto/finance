@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Plus, 
   TrendingUp, 
@@ -34,6 +34,7 @@ interface QuickActionsProps {
   onActionClick?: (actionId: string) => void;
   layout?: 'grid' | 'list';
   categories?: string[];
+  onLayoutChange?: (layout: 'grid' | 'list') => void;
 }
 
 const ACTION_VARIANTS = {
@@ -119,12 +120,23 @@ function QuickActionList({ action, onClick }: { action: QuickAction; onClick: ()
   );
 }
 
-export default function QuickActions({ 
-  actions = [], 
+export default function QuickActions({
+  actions = [],
   onActionClick,
-  layout = 'grid' 
+  layout = 'grid',
+  onLayoutChange
 }: QuickActionsProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [viewMode, setViewMode] = useState(layout);
+
+  useEffect(() => {
+    setViewMode(layout);
+  }, [layout]);
+
+  const handleViewModeChange = (mode: 'grid' | 'list') => {
+    setViewMode(mode);
+    onLayoutChange?.(mode);
+  };
 
   // Default quick actions
   const defaultActions: QuickAction[] = [
@@ -278,16 +290,16 @@ export default function QuickActions({
             
             <div className="flex items-center gap-2">
               <Button
-                variant={layout === 'grid' ? 'default' : 'outline'}
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => {}} // Toggle layout
+                onClick={() => handleViewModeChange('grid')}
               >
                 Grid
               </Button>
               <Button
-                variant={layout === 'list' ? 'default' : 'outline'}
+                variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => {}} // Toggle layout
+                onClick={() => handleViewModeChange('list')}
               >
                 Lista
               </Button>
@@ -320,12 +332,12 @@ export default function QuickActions({
 
       {/* Actions Grid/List */}
       <div className={cn(
-        layout === 'grid' 
+        viewMode === 'grid'
           ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
           : 'space-y-3'
       )}>
         {filteredActions.map((action) => (
-          layout === 'grid' ? (
+          viewMode === 'grid' ? (
             <QuickActionCard
               key={action.id}
               action={action}
