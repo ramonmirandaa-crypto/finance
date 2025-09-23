@@ -48,10 +48,19 @@ function GoalCard({ goal, onUpdate, onDelete }: {
   const [isEditing, setIsEditing] = useState(false);
   const [currentAmount, setCurrentAmount] = useState(goal.currentAmount);
 
-  const progress = (goal.currentAmount / goal.targetAmount) * 100;
+  const hasTargetAmount = goal.targetAmount > 0;
+  const rawProgress = hasTargetAmount ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+  const progressPercentage = Number.isFinite(rawProgress) ? rawProgress : 0;
+  const progressDisplay = Math.max(progressPercentage, 0).toFixed(1);
+  const progressBarWidth = Math.min(Math.max(progressPercentage, 0), 100);
   const daysLeft = Math.ceil((new Date(goal.targetDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
   const isOverdue = daysLeft < 0;
-  const isCompleted = goal.status === 'completed' || progress >= 100;
+  const isComplete = hasTargetAmount && goal.currentAmount >= goal.targetAmount;
+  const isCompleted = goal.status === 'completed' || isComplete;
+  const remainingAmount = Math.max(goal.targetAmount - goal.currentAmount, 0);
+  const completionMessage = isComplete
+    ? 'Meta concluída!'
+    : `Faltam ${formatCurrency(remainingAmount)} para atingir a meta`;
 
   const categoryConfig = GOAL_CATEGORIES.find(c => c.value === goal.category);
   const priorityConfig = PRIORITY_LEVELS.find(p => p.value === goal.priority);
@@ -108,7 +117,7 @@ function GoalCard({ goal, onUpdate, onDelete }: {
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Progresso</span>
-            <span className="text-sm text-gray-600">{progress.toFixed(1)}%</span>
+            <span className="text-sm text-gray-600">{progressDisplay}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div
@@ -116,8 +125,14 @@ function GoalCard({ goal, onUpdate, onDelete }: {
                 'h-3 rounded-full transition-all duration-300',
                 isCompleted ? 'bg-green-500' : 'bg-gradient-to-r from-emerald-500 to-teal-600'
               )}
-              style={{ width: `${Math.min(progress, 100)}%` }}
+              style={{ width: `${progressBarWidth}%` }}
             />
+          </div>
+          <div className="flex items-center justify-between mt-2 text-xs text-gray-600 sm:text-sm">
+            <Badge variant={isComplete ? 'success' : 'emerald'}>
+              {isComplete ? 'Concluída' : 'Em progresso'}
+            </Badge>
+            <span className="text-right">{completionMessage}</span>
           </div>
         </div>
 
