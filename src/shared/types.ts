@@ -312,6 +312,70 @@ export type CreateTransactionCategory = z.infer<typeof CreateTransactionCategory
 export type TransactionEnrichment = z.infer<typeof TransactionEnrichmentSchema>;
 export type BulkTransactionOperation = z.infer<typeof BulkTransactionOperationSchema>;
 
+// Budget schemas
+export const BudgetSchema = z.object({
+  id: z.number(),
+  user_id: z.string(),
+  name: z.string(),
+  category: z.string(),
+  amount: z.number(),
+  spent: z.number(),
+  period_start: z.string(),
+  period_end: z.string(),
+  status: z.string(),
+  notes: z.string().nullable(),
+  account_id: z.number().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  account_name: z.string().nullable().optional(),
+});
+
+export const CreateBudgetSchema = z.object({
+  name: z.string().min(1),
+  category: z.string().min(1),
+  amount: z.number(),
+  spent: z.number().optional(),
+  period_start: z.string(),
+  period_end: z.string(),
+  status: z.string().optional(),
+  notes: z.string().optional(),
+  account_id: z.number().optional(),
+});
+
+export const GoalSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  target_amount: z.number(),
+  current_amount: z.number(),
+  target_date: z.string(),
+  category: z.enum(['savings', 'investment', 'expense_reduction', 'debt_payment', 'other']),
+  status: z.enum(['active', 'completed', 'paused']),
+  priority: z.enum(['low', 'medium', 'high']),
+  account_id: z.number().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  account_name: z.string().nullable().optional(),
+});
+
+export const CreateGoalSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  target_amount: z.number(),
+  current_amount: z.number().optional(),
+  target_date: z.string(),
+  category: z.enum(['savings', 'investment', 'expense_reduction', 'debt_payment', 'other']).optional(),
+  status: z.enum(['active', 'completed', 'paused']).optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  account_id: z.number().optional(),
+});
+
+export type Budget = z.infer<typeof BudgetSchema>;
+export type CreateBudget = z.infer<typeof CreateBudgetSchema>;
+export type Goal = z.infer<typeof GoalSchema>;
+export type CreateGoal = z.infer<typeof CreateGoalSchema>;
+
 // Credit Card Bill schemas
 export const CreditCardBillSchema = z.object({
   id: z.number(),

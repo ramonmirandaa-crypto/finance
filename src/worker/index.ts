@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { Prisma, TransactionType } from '@prisma/client';
+import prisma from './prismaClient';
 import {
   exchangeCodeForSessionToken,
   getOAuthRedirectUrl,
@@ -51,10 +53,80 @@ const getUserId = (c: any): string | null => {
   if (user) {
     return user.id;
   }
-  
+
   // Fallback to header-based auth (legacy)
   const userId = c.req.header('X-User-ID') || c.req.header('x-user-id');
   return userId || null;
+};
+
+const normalizePrismaValue = (value: unknown): any => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(normalizePrismaValue);
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'object') {
+    if (typeof (value as { toNumber?: () => number }).toNumber === 'function') {
+      return (value as { toNumber: () => number }).toNumber();
+    }
+
+    const normalized: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      normalized[key] = normalizePrismaValue(entry);
+    }
+    return normalized;
+  }
+
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+
+  return value;
+};
+
+const withAccountMetadata = <T extends { account?: { name?: string | null; account_type?: string | null } | null }>(
+  entity: T,
+) => {
+  if (!entity || !entity.account) {
+    return entity;
+  }
+
+  const { account, ...rest } = entity as T & { account: { name?: string | null; account_type?: string | null } };
+  return {
+    ...rest,
+    account_name: account?.name ?? null,
+    account_type: account?.account_type ?? null,
+  } as Omit<T, 'account'> & { account_name: string | null; account_type: string | null };
+};
+
+const formatTransaction = (transaction: unknown) =>
+  normalizePrismaValue(withAccountMetadata(transaction as Record<string, unknown>));
+
+const formatBudget = (budget: unknown) => {
+  const normalized = normalizePrismaValue(budget as Record<string, unknown>) as Record<string, unknown>;
+  if ('account' in normalized) {
+    const account = normalized.account as Record<string, unknown> | null | undefined;
+    normalized.account_name = account && 'name' in account ? (account.name as string | null) : null;
+    delete normalized.account;
+  }
+  return normalized;
+};
+
+const formatGoal = (goal: unknown) => {
+  const normalized = normalizePrismaValue(goal as Record<string, unknown>) as Record<string, unknown>;
+  if ('account' in normalized) {
+    const account = normalized.account as Record<string, unknown> | null | undefined;
+    normalized.account_name = account && 'name' in account ? (account.name as string | null) : null;
+    delete normalized.account;
+  }
+  return normalized;
 };
 
 // ===========================================
@@ -237,13 +309,132 @@ app.get('/api/logout', async (c) => {
 app.get('/api/accounts', authMiddleware, async (c) => {
   const userId = getUserId(c);
 
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
   try {
-    const stmt = c.env.DB.prepare("SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at DESC");
-    const accounts = await stmt.bind(userId).all();
-    return Response.json({ accounts: accounts.results || [] });
+    const accounts = await prisma.account.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return Response.json({ accounts: normalizePrismaValue(accounts) });
   } catch (error) {
     console.error('Error fetching accounts:', error);
     return errorResponse('Failed to fetch accounts', 500);
+  }
+});
+
+app.post('/api/accounts', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const body = await c.req.json();
+    const {
+      name,
+      account_type,
+      account_subtype,
+      institution_name,
+      balance = 0,
+      sync_enabled = true,
+      currency_code = 'BRL',
+    } = body;
+
+    if (!name || !account_type) {
+      return errorResponse('Name and account type are required', 400);
+    }
+
+    const account = await prisma.account.create({
+      data: {
+        user_id: userId,
+        name,
+        account_type,
+        account_subtype,
+        institution_name,
+        balance,
+        sync_enabled,
+        currency_code,
+      },
+    });
+
+    return Response.json({ account: normalizePrismaValue(account) }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating account:', error);
+    return errorResponse('Failed to create account', 500);
+  }
+});
+
+app.put('/api/accounts/:id', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+  const accountId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(accountId)) {
+    return errorResponse('Invalid account id', 400);
+  }
+
+  try {
+    const updates = await c.req.json();
+
+    const { count } = await prisma.account.updateMany({
+      where: { id: accountId, user_id: userId },
+      data: {
+        name: updates.name,
+        account_type: updates.account_type,
+        account_subtype: updates.account_subtype,
+        institution_name: updates.institution_name,
+        balance: typeof updates.balance === 'number' ? updates.balance : undefined,
+        sync_enabled: typeof updates.sync_enabled === 'boolean' ? updates.sync_enabled : undefined,
+        currency_code: updates.currency_code,
+        is_active: typeof updates.is_active === 'boolean' ? updates.is_active : undefined,
+      },
+    });
+
+    if (count === 0) {
+      return errorResponse('Account not found', 404);
+    }
+
+    const account = await prisma.account.findUnique({ where: { id: accountId } });
+    return Response.json({ account: normalizePrismaValue(account) });
+  } catch (error) {
+    console.error('Error updating account:', error);
+    return errorResponse('Failed to update account', 500);
+  }
+});
+
+app.delete('/api/accounts/:id', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+  const accountId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(accountId)) {
+    return errorResponse('Invalid account id', 400);
+  }
+
+  try {
+    const { count } = await prisma.account.deleteMany({
+      where: { id: accountId, user_id: userId },
+    });
+
+    if (count === 0) {
+      return errorResponse('Account not found', 404);
+    }
+
+    return Response.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    return errorResponse('Failed to delete account', 500);
   }
 });
 
@@ -464,106 +655,115 @@ app.get('/api/credit-card-bills', authMiddleware, async (c) => {
 });
 
 // Transactions
+
 app.get('/api/transactions', authMiddleware, async (c) => {
   const userId = getUserId(c);
 
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
   try {
-    const page = parseInt(c.req.query('page') || '1');
-    const pageSize = parseInt(c.req.query('pageSize') || '50');
-    const offset = (page - 1) * pageSize;
+    const page = Math.max(parseInt(c.req.query('page') ?? '1', 10), 1);
+    const pageSize = Math.min(Math.max(parseInt(c.req.query('pageSize') ?? '20', 10), 1), 100);
+    const skip = (page - 1) * pageSize;
 
-    // Build filters with explicit table prefixes
-    const filters: string[] = ['t.user_id = ?'];
-    const params: any[] = [userId];
+    const where: Prisma.TransactionWhereInput = { user_id: userId };
 
-    // Add optional filters
     const accountId = c.req.query('accountId');
     if (accountId) {
-      filters.push('t.account_id = ?');
-      params.push(accountId);
-    }
-
-    const from = c.req.query('from');
-    if (from) {
-      filters.push('t.date >= ?');
-      params.push(from);
-    }
-
-    const to = c.req.query('to');
-    if (to) {
-      filters.push('t.date <= ?');
-      params.push(to);
+      const parsed = Number(accountId);
+      if (!Number.isNaN(parsed)) {
+        where.account_id = parsed;
+      }
     }
 
     const category = c.req.query('category');
     if (category) {
-      filters.push('t.category = ?');
-      params.push(category);
+      where.category = category;
     }
 
     const type = c.req.query('type');
-    if (type) {
-      filters.push('t.transaction_type = ?');
-      params.push(type);
+    if (type && ['income', 'expense', 'transfer'].includes(type)) {
+      where.transaction_type = type as TransactionType;
     }
 
     const description = c.req.query('description');
     if (description) {
-      filters.push('t.description LIKE ?');
-      params.push(`%${description}%`);
+      where.description = { contains: description, mode: 'insensitive' };
     }
 
     const merchantName = c.req.query('merchantName');
     if (merchantName) {
-      filters.push('t.merchant_name LIKE ?');
-      params.push(`%${merchantName}%`);
+      where.merchant_name = { contains: merchantName, mode: 'insensitive' };
     }
 
+    const amountFilter: Prisma.DecimalFilter = {};
     const amountGte = c.req.query('amountGte');
     if (amountGte) {
-      filters.push('t.amount >= ?');
-      params.push(parseFloat(amountGte));
+      const parsed = Number(amountGte);
+      if (!Number.isNaN(parsed)) {
+        amountFilter.gte = parsed;
+      }
     }
-
     const amountLte = c.req.query('amountLte');
     if (amountLte) {
-      filters.push('t.amount <= ?');
-      params.push(parseFloat(amountLte));
+      const parsed = Number(amountLte);
+      if (!Number.isNaN(parsed)) {
+        amountFilter.lte = parsed;
+      }
+    }
+    if (amountFilter.gte !== undefined || amountFilter.lte !== undefined) {
+      where.amount = amountFilter;
     }
 
-    const whereClause = filters.join(' AND ');
+    const dateFilter: Prisma.DateTimeFilter = {};
+    const from = c.req.query('from');
+    if (from) {
+      const parsed = new Date(from);
+      if (!Number.isNaN(parsed.getTime())) {
+        dateFilter.gte = parsed;
+      }
+    }
+    const to = c.req.query('to');
+    if (to) {
+      const parsed = new Date(to);
+      if (!Number.isNaN(parsed.getTime())) {
+        dateFilter.lte = parsed;
+      }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+      where.date = dateFilter;
+    }
 
-    // Get total count
-    const countStmt = c.env.DB.prepare(`
-      SELECT COUNT(*) as total 
-      FROM transactions t
-      LEFT JOIN accounts a ON t.account_id = a.id
-      WHERE ${whereClause}
-    `);
-    const countResult = await countStmt.bind(...params).first() as any;
-    const total = countResult?.total || 0;
-    const totalPages = Math.ceil(total / pageSize);
+    const [transactions, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: {
+          account: {
+            select: {
+              name: true,
+              account_type: true,
+            },
+          },
+        },
+        orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.transaction.count({ where }),
+    ]);
 
-    // Get transactions with account names
-    const stmt = c.env.DB.prepare(`
-      SELECT t.*, a.name as account_name, a.account_type
-      FROM transactions t
-      LEFT JOIN accounts a ON t.account_id = a.id
-      WHERE ${whereClause}
-      ORDER BY t.date DESC, t.created_at DESC
-      LIMIT ? OFFSET ?
-    `);
-
-    const transactions = await stmt.bind(...params, pageSize, offset).all();
+    const items = transactions.map((transaction) => formatTransaction(transaction));
 
     return Response.json({
-      transactions: transactions.results || [],
+      transactions: items,
       pagination: {
         page,
         pageSize,
         total,
-        totalPages
-      }
+        totalPages: Math.ceil(total / pageSize),
+      },
     });
   } catch (error) {
     console.error('Error fetching transactions:', error);
@@ -571,100 +771,124 @@ app.get('/api/transactions', authMiddleware, async (c) => {
   }
 });
 
+
 app.get('/api/transactions/analytics', authMiddleware, async (c) => {
   const userId = getUserId(c);
 
-  try {
-    const filters: string[] = ['user_id = ?'];
-    const params: any[] = [userId];
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
 
-    // Add optional filters
+  try {
+    const where: Prisma.TransactionWhereInput = { user_id: userId };
+
     const accountId = c.req.query('accountId');
     if (accountId) {
-      filters.push('account_id = ?');
-      params.push(accountId);
+      const parsed = Number(accountId);
+      if (!Number.isNaN(parsed)) {
+        where.account_id = parsed;
+      }
     }
 
     const from = c.req.query('from');
-    if (from) {
-      filters.push('date >= ?');
-      params.push(from);
-    }
-
     const to = c.req.query('to');
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (from) {
+      const parsed = new Date(from);
+      if (!Number.isNaN(parsed.getTime())) {
+        dateFilter.gte = parsed;
+      }
+    }
     if (to) {
-      filters.push('date <= ?');
-      params.push(to);
+      const parsed = new Date(to);
+      if (!Number.isNaN(parsed.getTime())) {
+        dateFilter.lte = parsed;
+      }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+      where.date = dateFilter;
     }
 
-    const whereClause = filters.join(' AND ');
+    const transactions = await prisma.transaction.findMany({
+      where,
+      select: {
+        amount: true,
+        category: true,
+        merchant_name: true,
+        date: true,
+      },
+    });
 
-    // Total transactions and amount
-    const totalStmt = c.env.DB.prepare(`
-      SELECT 
-        COUNT(*) as totalTransactions,
-        SUM(amount) as totalAmount,
-        AVG(amount) as averageAmount
-      FROM transactions 
-      WHERE ${whereClause}
-    `);
-    const totalResult = await totalStmt.bind(...params).first() as any;
+    const totals = transactions.reduce(
+      (acc, transaction) => {
+        const amount = typeof transaction.amount === 'number'
+          ? transaction.amount
+          : (transaction.amount as unknown as { toNumber: () => number }).toNumber();
 
-    // Category breakdown - need to bind params twice for the subquery
-    const categoryStmt = c.env.DB.prepare(`
-      SELECT 
-        category,
-        SUM(amount) as totalAmount,
-        COUNT(*) as transactionCount,
-        CASE 
-          WHEN (SELECT SUM(amount) FROM transactions WHERE ${whereClause}) > 0 
-          THEN (SUM(amount) * 100.0 / (SELECT SUM(amount) FROM transactions WHERE ${whereClause}))
-          ELSE 0 
-        END as percentage
-      FROM transactions 
-      WHERE ${whereClause}
-      GROUP BY category
-      ORDER BY totalAmount DESC
-    `);
-    // Need to pass params three times: once for main query, twice for subqueries
-    const categoryParams = [...params, ...params, ...params];
-    const categoryResult = await categoryStmt.bind(...categoryParams).all();
+        acc.totalAmount += amount;
+        acc.totalTransactions += 1;
 
-    // Monthly trends
-    const monthlyStmt = c.env.DB.prepare(`
-      SELECT 
-        strftime('%Y-%m', date) as month,
-        SUM(amount) as totalAmount,
-        COUNT(*) as transactionCount
-      FROM transactions 
-      WHERE ${whereClause}
-      GROUP BY strftime('%Y-%m', date)
-      ORDER BY month DESC
-      LIMIT 12
-    `);
-    const monthlyResult = await monthlyStmt.bind(...params).all();
+        const monthKey = transaction.date.toISOString().slice(0, 7);
+        const categoryKey = transaction.category ?? 'Outros';
+        const merchantKey = transaction.merchant_name ?? 'Outros';
 
-    // Top merchants
-    const merchantStmt = c.env.DB.prepare(`
-      SELECT 
-        merchant_name,
-        SUM(amount) as totalAmount,
-        COUNT(*) as transactionCount
-      FROM transactions 
-      WHERE ${whereClause} AND merchant_name IS NOT NULL
-      GROUP BY merchant_name
-      ORDER BY totalAmount DESC
-      LIMIT 10
-    `);
-    const merchantResult = await merchantStmt.bind(...params).all();
+        if (!acc.categoryBreakdown[categoryKey]) {
+          acc.categoryBreakdown[categoryKey] = { totalAmount: 0, transactionCount: 0 };
+        }
+        acc.categoryBreakdown[categoryKey].totalAmount += amount;
+        acc.categoryBreakdown[categoryKey].transactionCount += 1;
+
+        if (!acc.monthlyTrends[monthKey]) {
+          acc.monthlyTrends[monthKey] = { totalAmount: 0, transactionCount: 0 };
+        }
+        acc.monthlyTrends[monthKey].totalAmount += amount;
+        acc.monthlyTrends[monthKey].transactionCount += 1;
+
+        if (transaction.merchant_name) {
+          if (!acc.topMerchants[merchantKey]) {
+            acc.topMerchants[merchantKey] = { totalAmount: 0, transactionCount: 0 };
+          }
+          acc.topMerchants[merchantKey].totalAmount += amount;
+          acc.topMerchants[merchantKey].transactionCount += 1;
+        }
+
+        return acc;
+      },
+      {
+        totalTransactions: 0,
+        totalAmount: 0,
+        categoryBreakdown: {} as Record<string, { totalAmount: number; transactionCount: number }>,
+        monthlyTrends: {} as Record<string, { totalAmount: number; transactionCount: number }>,
+        topMerchants: {} as Record<string, { totalAmount: number; transactionCount: number }>,
+      },
+    );
+
+    const averageAmount = totals.totalTransactions > 0 ? totals.totalAmount / totals.totalTransactions : 0;
+
+    const categoryBreakdown = Object.entries(totals.categoryBreakdown).map(([categoryKey, data]) => ({
+      category: categoryKey,
+      totalAmount: data.totalAmount,
+      transactionCount: data.transactionCount,
+      percentage: totals.totalAmount > 0 ? (data.totalAmount * 100) / totals.totalAmount : 0,
+    }));
+
+    const monthlyTrends = Object.entries(totals.monthlyTrends)
+      .map(([month, data]) => ({ month, totalAmount: data.totalAmount, transactionCount: data.transactionCount }))
+      .sort((a, b) => (a.month < b.month ? 1 : -1))
+      .slice(0, 12);
+
+    const topMerchants = Object.entries(totals.topMerchants)
+      .map(([merchant, data]) => ({ merchant_name: merchant, totalAmount: data.totalAmount, transactionCount: data.transactionCount }))
+      .sort((a, b) => b.totalAmount - a.totalAmount)
+      .slice(0, 10);
 
     return Response.json({
-      totalTransactions: totalResult?.totalTransactions || 0,
-      totalAmount: totalResult?.totalAmount || 0,
-      averageAmount: totalResult?.averageAmount || 0,
-      categoryBreakdown: categoryResult.results || [],
-      monthlyTrends: monthlyResult.results || [],
-      topMerchants: merchantResult.results || []
+      totalTransactions: totals.totalTransactions,
+      totalAmount: totals.totalAmount,
+      averageAmount,
+      categoryBreakdown,
+      monthlyTrends,
+      topMerchants,
     });
   } catch (error) {
     console.error('Error fetching transaction analytics:', error);
@@ -675,6 +899,10 @@ app.get('/api/transactions/analytics', authMiddleware, async (c) => {
 app.post('/api/transactions/bulk', authMiddleware, async (c) => {
   const userId = getUserId(c);
 
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
   try {
     const { operation, transactionIds, params: opParams } = await c.req.json();
 
@@ -682,39 +910,39 @@ app.post('/api/transactions/bulk', authMiddleware, async (c) => {
       return errorResponse('Invalid bulk operation parameters', 400);
     }
 
-    const placeholders = transactionIds.map(() => '?').join(',');
+    const ids = transactionIds
+      .map((id: unknown) => Number(id))
+      .filter((id: number) => !Number.isNaN(id));
+
+    if (ids.length === 0) {
+      return errorResponse('No valid transactions selected', 400);
+    }
 
     switch (operation) {
-      case 'categorize':
+      case 'categorize': {
         if (!opParams?.category) {
           return errorResponse('Category is required for categorize operation', 400);
         }
-        
-        const categorizeStmt = c.env.DB.prepare(`
-          UPDATE transactions 
-          SET category = ?, updated_at = datetime('now')
-          WHERE id IN (${placeholders}) AND user_id = ?
-        `);
-        await categorizeStmt.bind(opParams.category, ...transactionIds, userId).run();
-        break;
 
-      case 'reconcile':
-        const reconcileStmt = c.env.DB.prepare(`
-          UPDATE transactions 
-          SET reconciled = ?, updated_at = datetime('now')
-          WHERE id IN (${placeholders}) AND user_id = ?
-        `);
-        await reconcileStmt.bind(opParams?.reconciled || false, ...transactionIds, userId).run();
+        await prisma.transaction.updateMany({
+          where: { id: { in: ids }, user_id: userId },
+          data: { category: opParams.category },
+        });
         break;
-
-      case 'delete':
-        const deleteStmt = c.env.DB.prepare(`
-          DELETE FROM transactions 
-          WHERE id IN (${placeholders}) AND user_id = ?
-        `);
-        await deleteStmt.bind(...transactionIds, userId).run();
+      }
+      case 'reconcile': {
+        await prisma.transaction.updateMany({
+          where: { id: { in: ids }, user_id: userId },
+          data: { reconciled: Boolean(opParams?.reconciled) },
+        });
         break;
-
+      }
+      case 'delete': {
+        await prisma.transaction.deleteMany({
+          where: { id: { in: ids }, user_id: userId },
+        });
+        break;
+      }
       default:
         return errorResponse('Invalid operation', 400);
     }
@@ -728,42 +956,53 @@ app.post('/api/transactions/bulk', authMiddleware, async (c) => {
 
 app.put('/api/transactions/:id', authMiddleware, async (c) => {
   const userId = getUserId(c);
-  const transactionId = c.req.param('id');
+  const transactionId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(transactionId)) {
+    return errorResponse('Invalid transaction id', 400);
+  }
 
   try {
     const updates = await c.req.json();
-    
-    const allowedFields = ['description', 'category', 'merchant_name', 'notes', 'reconciled'];
-    const updateFields: string[] = [];
-    const updateValues: any[] = [];
+    const allowedFields = ['description', 'category', 'merchant_name', 'notes', 'reconciled'] as const;
 
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowedFields.includes(key)) {
-        updateFields.push(`${key} = ?`);
-        updateValues.push(value);
+    const data: Prisma.TransactionUpdateManyMutationInput = {};
+    for (const field of allowedFields) {
+      if (field in updates) {
+        (data as Record<string, unknown>)[field] = updates[field];
       }
     }
 
-    if (updateFields.length === 0) {
+    if (Object.keys(data).length === 0) {
       return errorResponse('No valid fields to update', 400);
     }
 
-    updateFields.push('updated_at = datetime(\'now\')');
-    updateValues.push(transactionId, userId);
+    const result = await prisma.transaction.updateMany({
+      where: { id: transactionId, user_id: userId },
+      data,
+    });
 
-    const stmt = c.env.DB.prepare(`
-      UPDATE transactions 
-      SET ${updateFields.join(', ')}
-      WHERE id = ? AND user_id = ?
-    `);
-
-    const result = await stmt.bind(...updateValues).run();
-    
-    if (!result.success) {
+    if (result.count === 0) {
       return errorResponse('Transaction not found', 404);
     }
 
-    return Response.json({ message: 'Transaction updated successfully' });
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        account: {
+          select: {
+            name: true,
+            account_type: true,
+          },
+        },
+      },
+    });
+
+    return Response.json({ transaction: transaction ? formatTransaction(transaction) : null });
   } catch (error) {
     console.error('Error updating transaction:', error);
     return errorResponse('Failed to update transaction', 500);
@@ -772,13 +1011,22 @@ app.put('/api/transactions/:id', authMiddleware, async (c) => {
 
 app.delete('/api/transactions/:id', authMiddleware, async (c) => {
   const userId = getUserId(c);
-  const transactionId = c.req.param('id');
+  const transactionId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(transactionId)) {
+    return errorResponse('Invalid transaction id', 400);
+  }
 
   try {
-    const stmt = c.env.DB.prepare("DELETE FROM transactions WHERE id = ? AND user_id = ?");
-    const result = await stmt.bind(transactionId, userId).run();
-    
-    if (!result.success) {
+    const result = await prisma.transaction.deleteMany({
+      where: { id: transactionId, user_id: userId },
+    });
+
+    if (result.count === 0) {
       return errorResponse('Transaction not found', 404);
     }
 
@@ -791,56 +1039,64 @@ app.delete('/api/transactions/:id', authMiddleware, async (c) => {
 
 app.post('/api/transactions/:id/categorize', authMiddleware, async (c) => {
   const userId = getUserId(c);
-  const transactionId = c.req.param('id');
+  const transactionId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(transactionId)) {
+    return errorResponse('Invalid transaction id', 400);
+  }
 
   try {
-    // Get transaction
-    const transactionStmt = c.env.DB.prepare("SELECT * FROM transactions WHERE id = ? AND user_id = ?");
-    const transaction = await transactionStmt.bind(transactionId, userId).first() as any;
-    
+    const transaction = await prisma.transaction.findFirst({
+      where: { id: transactionId, user_id: userId },
+      select: {
+        id: true,
+        description: true,
+        merchant_name: true,
+      },
+    });
+
     if (!transaction) {
       return errorResponse('Transaction not found', 404);
     }
 
-    // Simple auto-categorization logic based on description/merchant
     let autoCategory = 'Outros';
     const description = (transaction.description || '').toLowerCase();
     const merchant = (transaction.merchant_name || '').toLowerCase();
-    
+
     const categoryRules = [
       { keywords: ['uber', 'taxi', 'transporte', 'metro', 'onibus'], category: 'Transporte' },
       { keywords: ['ifood', 'restaurante', 'lanchonete', 'comida', 'alimentacao'], category: 'Alimentação' },
       { keywords: ['shopping', 'loja', 'magazine', 'mercado'], category: 'Compras' },
       { keywords: ['cinema', 'teatro', 'entretenimento', 'lazer'], category: 'Entretenimento' },
       { keywords: ['farmacia', 'hospital', 'medico', 'saude'], category: 'Saúde' },
-      { keywords: ['energia', 'agua', 'telefone', 'internet', 'conta'], category: 'Contas e Serviços' }
+      { keywords: ['energia', 'agua', 'telefone', 'internet', 'conta'], category: 'Contas e Serviços' },
     ];
 
     for (const rule of categoryRules) {
-      if (rule.keywords.some(keyword => description.includes(keyword) || merchant.includes(keyword))) {
+      if (rule.keywords.some((keyword) => description.includes(keyword) || merchant.includes(keyword))) {
         autoCategory = rule.category;
         break;
       }
     }
 
-    // Update transaction category
-    const updateStmt = c.env.DB.prepare(`
-      UPDATE transactions 
-      SET category = ?, updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `);
-    await updateStmt.bind(autoCategory, transactionId, userId).run();
+    await prisma.transaction.updateMany({
+      where: { id: transactionId, user_id: userId },
+      data: { category: autoCategory },
+    });
 
-    return Response.json({ 
-      message: 'Transaction categorized successfully', 
-      category: autoCategory 
+    return Response.json({
+      message: 'Transaction categorized successfully',
+      category: autoCategory,
     });
   } catch (error) {
     console.error('Error auto-categorizing transaction:', error);
     return errorResponse('Failed to categorize transaction', 500);
   }
 });
-
 // Transaction Categories
 app.get('/api/transaction-categories', authMiddleware, async (c) => {
   const userId = getUserId(c);
@@ -938,7 +1194,7 @@ app.delete('/api/transaction-categories/:id', authMiddleware, async (c) => {
   try {
     const stmt = c.env.DB.prepare("DELETE FROM transaction_categories WHERE id = ? AND user_id = ? AND is_default = FALSE");
     const result = await stmt.bind(categoryId, userId).run();
-    
+
     if (!result.success) {
       return errorResponse('Category not found or cannot be deleted', 404);
     }
@@ -947,6 +1203,378 @@ app.delete('/api/transaction-categories/:id', authMiddleware, async (c) => {
   } catch (error) {
     console.error('Error deleting transaction category:', error);
     return errorResponse('Failed to delete category', 500);
+  }
+});
+
+// ===========================================
+// BUDGET MANAGEMENT ROUTES
+// ===========================================
+
+app.get('/api/budgets', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const budgets = await prisma.budget.findMany({
+      where: { user_id: userId },
+      include: {
+        account: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: [{ period_start: 'desc' }, { created_at: 'desc' }],
+    });
+
+    return Response.json({ budgets: budgets.map((budget) => formatBudget(budget)) });
+  } catch (error) {
+    console.error('Error fetching budgets:', error);
+    return errorResponse('Failed to fetch budgets', 500);
+  }
+});
+
+app.post('/api/budgets', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const body = await c.req.json();
+    const { name, category, amount, period_start, period_end } = body;
+
+    if (!name?.trim() || !category?.trim()) {
+      return errorResponse('Name and category are required', 400);
+    }
+
+    const startDate = new Date(period_start);
+    const endDate = new Date(period_end);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return errorResponse('Invalid period dates', 400);
+    }
+
+    const budget = await prisma.budget.create({
+      data: {
+        user_id: userId,
+        name: name.trim(),
+        category: category.trim(),
+        amount: typeof amount === 'number' ? amount : Number(amount) || 0,
+        spent: typeof body.spent === 'number' ? body.spent : 0,
+        period_start: startDate,
+        period_end: endDate,
+        status: body.status || 'active',
+        notes: body.notes,
+        account_id: body.account_id ? Number(body.account_id) : undefined,
+      },
+      include: {
+        account: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    return Response.json({ budget: formatBudget(budget) }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating budget:', error);
+    return errorResponse('Failed to create budget', 500);
+  }
+});
+
+app.put('/api/budgets/:id', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+  const budgetId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(budgetId)) {
+    return errorResponse('Invalid budget id', 400);
+  }
+
+  try {
+    const updates = await c.req.json();
+    const data: Prisma.BudgetUpdateManyMutationInput = {};
+
+    if (typeof updates.name === 'string') {
+      data.name = updates.name.trim();
+    }
+    if (typeof updates.category === 'string') {
+      data.category = updates.category.trim();
+    }
+    if (updates.amount !== undefined) {
+      data.amount = typeof updates.amount === 'number' ? updates.amount : Number(updates.amount) || 0;
+    }
+    if (updates.spent !== undefined) {
+      data.spent = typeof updates.spent === 'number' ? updates.spent : Number(updates.spent) || 0;
+    }
+    if (typeof updates.status === 'string') {
+      data.status = updates.status;
+    }
+    if (typeof updates.notes === 'string' || updates.notes === null) {
+      data.notes = updates.notes;
+    }
+    if (updates.period_start) {
+      const startDate = new Date(updates.period_start);
+      if (Number.isNaN(startDate.getTime())) {
+        return errorResponse('Invalid period_start date', 400);
+      }
+      data.period_start = startDate;
+    }
+    if (updates.period_end) {
+      const endDate = new Date(updates.period_end);
+      if (Number.isNaN(endDate.getTime())) {
+        return errorResponse('Invalid period_end date', 400);
+      }
+      data.period_end = endDate;
+    }
+    if (updates.account_id !== undefined) {
+      data.account_id = updates.account_id === null ? null : Number(updates.account_id);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return errorResponse('No valid fields to update', 400);
+    }
+
+    const result = await prisma.budget.updateMany({
+      where: { id: budgetId, user_id: userId },
+      data,
+    });
+
+    if (result.count === 0) {
+      return errorResponse('Budget not found', 404);
+    }
+
+    const budget = await prisma.budget.findUnique({
+      where: { id: budgetId },
+      include: {
+        account: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    return Response.json({ budget: budget ? formatBudget(budget) : null });
+  } catch (error) {
+    console.error('Error updating budget:', error);
+    return errorResponse('Failed to update budget', 500);
+  }
+});
+
+app.delete('/api/budgets/:id', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+  const budgetId = Number(c.req.param('id'));
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  if (Number.isNaN(budgetId)) {
+    return errorResponse('Invalid budget id', 400);
+  }
+
+  try {
+    const result = await prisma.budget.deleteMany({
+      where: { id: budgetId, user_id: userId },
+    });
+
+    if (result.count === 0) {
+      return errorResponse('Budget not found', 404);
+    }
+
+    return Response.json({ message: 'Budget deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting budget:', error);
+    return errorResponse('Failed to delete budget', 500);
+  }
+});
+
+// ===========================================
+// GOAL MANAGEMENT ROUTES
+// ===========================================
+
+app.get('/api/goals', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const goals = await prisma.goal.findMany({
+      where: { user_id: userId },
+      include: {
+        account: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: [{ target_date: 'asc' }, { created_at: 'desc' }],
+    });
+
+    return Response.json({ goals: goals.map((goal) => formatGoal(goal)) });
+  } catch (error) {
+    console.error('Error fetching goals:', error);
+    return errorResponse('Failed to fetch goals', 500);
+  }
+});
+
+app.post('/api/goals', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const body = await c.req.json();
+    const { title, target_amount, target_date } = body;
+
+    if (!title?.trim()) {
+      return errorResponse('Title is required', 400);
+    }
+
+    const targetDate = new Date(target_date);
+    if (Number.isNaN(targetDate.getTime())) {
+      return errorResponse('Invalid target date', 400);
+    }
+
+    const goal = await prisma.goal.create({
+      data: {
+        user_id: userId,
+        title: title.trim(),
+        description: body.description,
+        target_amount: typeof target_amount === 'number' ? target_amount : Number(target_amount) || 0,
+        current_amount: typeof body.current_amount === 'number' ? body.current_amount : 0,
+        target_date: targetDate,
+        category: body.category || 'savings',
+        status: body.status || 'active',
+        priority: body.priority || 'medium',
+        account_id: body.account_id ? Number(body.account_id) : undefined,
+      },
+      include: {
+        account: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    return Response.json({ goal: formatGoal(goal) }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating goal:', error);
+    return errorResponse('Failed to create goal', 500);
+  }
+});
+
+app.put('/api/goals/:id', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+  const goalId = c.req.param('id');
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const updates = await c.req.json();
+    const data: Prisma.GoalUpdateManyMutationInput = {};
+
+    if (typeof updates.title === 'string') {
+      data.title = updates.title.trim();
+    }
+    if (typeof updates.description === 'string' || updates.description === null) {
+      data.description = updates.description;
+    }
+    if (updates.target_amount !== undefined) {
+      data.target_amount = typeof updates.target_amount === 'number' ? updates.target_amount : Number(updates.target_amount) || 0;
+    }
+    if (updates.current_amount !== undefined) {
+      data.current_amount = typeof updates.current_amount === 'number' ? updates.current_amount : Number(updates.current_amount) || 0;
+    }
+    if (updates.target_date) {
+      const targetDate = new Date(updates.target_date);
+      if (Number.isNaN(targetDate.getTime())) {
+        return errorResponse('Invalid target date', 400);
+      }
+      data.target_date = targetDate;
+    }
+    if (typeof updates.category === 'string') {
+      data.category = updates.category;
+    }
+    if (typeof updates.status === 'string') {
+      data.status = updates.status;
+    }
+    if (typeof updates.priority === 'string') {
+      data.priority = updates.priority;
+    }
+    if (updates.account_id !== undefined) {
+      data.account_id = updates.account_id === null ? null : Number(updates.account_id);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return errorResponse('No valid fields to update', 400);
+    }
+
+    const result = await prisma.goal.updateMany({
+      where: { id: goalId, user_id: userId },
+      data,
+    });
+
+    if (result.count === 0) {
+      return errorResponse('Goal not found', 404);
+    }
+
+    const goal = await prisma.goal.findUnique({
+      where: { id: goalId },
+      include: {
+        account: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    return Response.json({ goal: goal ? formatGoal(goal) : null });
+  } catch (error) {
+    console.error('Error updating goal:', error);
+    return errorResponse('Failed to update goal', 500);
+  }
+});
+
+app.delete('/api/goals/:id', authMiddleware, async (c) => {
+  const userId = getUserId(c);
+  const goalId = c.req.param('id');
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  try {
+    const result = await prisma.goal.deleteMany({
+      where: { id: goalId, user_id: userId },
+    });
+
+    if (result.count === 0) {
+      return errorResponse('Goal not found', 404);
+    }
+
+    return Response.json({ message: 'Goal deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting goal:', error);
+    return errorResponse('Failed to delete goal', 500);
   }
 });
 
