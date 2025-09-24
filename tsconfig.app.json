@@ -12,6 +12,7 @@
       "@/*": ["./src/*"]
     },
     "types": ["react", "react-dom", "vite/client"],
+    "typeRoots": ["./src/react-app/types", "./node_modules/@types"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
