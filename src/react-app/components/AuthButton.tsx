@@ -1,4 +1,4 @@
-import { useAuth } from '@getmocha/users-service/react';
+import { SignInButton, useAuth, useUser } from '@clerk/clerk-react';
 import { LogOut, User } from 'lucide-react';
 
 const GoogleIcon = () => (
@@ -11,9 +11,10 @@ const GoogleIcon = () => (
 );
 
 export default function AuthButton() {
-  const { user, redirectToLogin, logout, isPending } = useAuth();
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useAuth();
 
-  if (isPending) {
+  if (!isLoaded) {
     return (
       <div className="animate-pulse">
         <div className="w-32 h-10 bg-gray-200 rounded-xl"></div>
@@ -21,25 +22,28 @@ export default function AuthButton() {
     );
   }
 
-  if (user) {
+  if (isSignedIn && user) {
+    const displayName =
+      user.firstName ||
+      user.fullName ||
+      user.primaryEmailAddress?.emailAddress ||
+      user.username ||
+      'Conta';
+
     return (
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 px-4 py-2 bg-white/70 backdrop-blur-sm rounded-xl border border-white/50">
-          {user.google_user_data.picture ? (
-            <img 
-              src={user.google_user_data.picture} 
-              alt={user.google_user_data.name || user.email}
-              className="w-6 h-6 rounded-full"
-            />
+          {user.imageUrl ? (
+            <img src={user.imageUrl} alt={displayName} className="w-6 h-6 rounded-full" />
           ) : (
             <User className="w-5 h-5 text-gray-600" />
           )}
           <span className="text-sm font-medium text-gray-900">
-            {user.google_user_data.given_name || user.email}
+            {displayName}
           </span>
         </div>
         <button
-          onClick={logout}
+          onClick={() => signOut()}
           className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
           title="Sair"
         >
@@ -51,12 +55,11 @@ export default function AuthButton() {
   }
 
   return (
-    <button
-      onClick={redirectToLogin}
-      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-    >
-      <GoogleIcon />
-      Entrar com Google
-    </button>
+    <SignInButton mode="modal" afterSignInUrl="/" afterSignUpUrl="/">
+      <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl">
+        <GoogleIcon />
+        Entrar ou criar conta
+      </button>
+    </SignInButton>
   );
 }

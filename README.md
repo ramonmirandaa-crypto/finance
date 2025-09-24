@@ -1,13 +1,25 @@
 ## Financeito
 
-This app was created using https://getmocha.com.
-Need help or want to join the community? Join our [Discord](https://discord.gg/shDEGBSe2d).
+Financeito é um gerenciador financeiro com autenticação gerenciada pelo [Clerk](https://clerk.com).
+
+Para suporte adicional ou para conversar com a comunidade, acesse nosso [Discord](https://discord.gg/shDEGBSe2d).
 
 To run the devserver:
 ```
 npm install
 npm run dev
 ```
+
+### Autenticação Clerk
+
+Configure as seguintes variáveis de ambiente (veja `.env.example`):
+
+```
+VITE_CLERK_PUBLISHABLE_KEY="pk_test_xxx"
+CLERK_SECRET_KEY="sk_test_xxx"
+```
+
+O `publishable key` é utilizado no front-end e o `secret key` mantém a validação de sessões no Worker.
 
 ### Prisma tooling
 

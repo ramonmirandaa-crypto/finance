@@ -1,17 +1,22 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
-import { AuthProvider } from "@getmocha/users-service/react";
+import { ClerkLoaded, ClerkLoading } from "@clerk/clerk-react";
 import HomePage from "@/react-app/pages/Home";
-import AuthCallbackPage from "@/react-app/pages/AuthCallback";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <ClerkLoading>
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <div className="animate-pulse">
+            <div className="h-32 w-32 rounded-3xl bg-white/10" />
+          </div>
+        </div>
+      </ClerkLoading>
+      <ClerkLoaded>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
         </Routes>
-      </Router>
-    </AuthProvider>
+      </ClerkLoaded>
+    </Router>
   );
 }
