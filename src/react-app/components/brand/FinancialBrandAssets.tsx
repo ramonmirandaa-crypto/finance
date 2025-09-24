@@ -387,7 +387,8 @@ export const getCardNetworkVisual = (
     network.keywords.some(keyword => normalized.includes(keyword))
   );
   const networkId = detected?.id || fallback || 'default';
-  return CARD_NETWORKS[networkId];
+  const network = CARD_NETWORKS[networkId];
+  return { id: networkId, ...network };
 };
 
 export const resolveAvailableBankOption = (value?: string | null) => {
