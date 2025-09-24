@@ -1,6 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@getmocha/users-service/react';
-import { Wallet, TrendingUp, Target, RefreshCw, CreditCard, Banknote, BarChart3, Building2, Zap, Bell, Bolt } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Wallet,
+  TrendingUp,
+  Target,
+  CreditCard,
+  Banknote,
+  BarChart3,
+  Building2,
+  Zap,
+  Bell,
+  Bolt,
+  ShieldCheck,
+  Brain,
+  Sparkles,
+} from 'lucide-react';
 import ExpenseTracker from '@/react-app/components/blocks/ExpenseTracker';
 import AIInsights from '@/react-app/components/AIInsights';
 import ExpenseGraphs from '@/react-app/components/ExpenseGraphs';
@@ -12,35 +27,30 @@ import PluggyManager from '@/react-app/components/PluggyManager';
 import AccountManager from '@/react-app/components/AccountManager';
 import NotificationCenter from '@/react-app/components/blocks/NotificationCenter';
 import QuickActions from '@/react-app/components/blocks/QuickActions';
-
 import TransactionManager from '@/react-app/components/TransactionManager';
 import TransactionCategoryManager from '@/react-app/components/TransactionCategoryManager';
-import AuthButton from '@/react-app/components/AuthButton';
 import LoginPrompt from '@/react-app/components/LoginPrompt';
-import { formatCurrency } from '@/react-app/utils';
+import HeroSection from '@/react-app/components/sections/HeroSection';
+import FeatureHighlights from '@/react-app/components/sections/FeatureHighlights';
+import FinancePreviewSection, { OverlayView } from '@/react-app/components/sections/FinancePreviewSection';
+import CallToActionSection from '@/react-app/components/sections/CallToActionSection';
+import ExperienceOverlay from '@/react-app/components/layout/ExperienceOverlay';
 import { Expense, CreateExpense } from '@/shared/types';
-
-type ActiveSection = 'dashboard' | 'transactions' | 'categories' | 'accounts' | 'banking' | 'credit-cards' | 'investments' | 'loans' | 'insights' | 'analytics' | 'notifications' | 'quick-actions';
 
 export default function Home() {
   const { user, isPending } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [refreshInsights, setRefreshInsights] = useState(0);
-  const [activeSection, setActiveSection] = useState<ActiveSection>('dashboard');
+  const [activeOverlay, setActiveOverlay] = useState<OverlayView | null>(null);
 
-  // Fetch expenses
   const fetchExpenses = async () => {
     try {
-      setLoading(true);
       const response = await fetch('/api/expenses');
       const data = await response.json();
       setExpenses(data.expenses || []);
     } catch (error) {
       console.error('Failed to fetch expenses:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -50,12 +60,11 @@ export default function Home() {
     }
   }, [user]);
 
-  // Show login prompt if user is not authenticated
   if (isPending) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 paper-texture flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="animate-pulse">
-          <div className="w-32 h-32 bg-gray-200 rounded-2xl"></div>
+          <div className="h-32 w-32 rounded-3xl bg-white/10" />
         </div>
       </div>
     );
@@ -65,7 +74,6 @@ export default function Home() {
     return <LoginPrompt />;
   }
 
-  // Add expense
   const handleAddExpense = async (expenseData: CreateExpense) => {
     try {
       setSubmitting(true);
@@ -74,7 +82,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expenseData),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setExpenses(prev => [data.expense, ...prev]);
@@ -87,179 +95,185 @@ export default function Home() {
     }
   };
 
-  
-
-  // Calculate stats
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const thisMonthExpenses = expenses.filter(expense => {
-    const expenseDate = new Date(expense.date);
-    const now = new Date();
-    return expenseDate.getMonth() === now.getMonth() && 
-           expenseDate.getFullYear() === now.getFullYear();
-  }).reduce((sum, expense) => sum + expense.amount, 0);
+  const thisMonthExpenses = expenses
+    .filter(expense => {
+      const expenseDate = new Date(expense.date);
+      const now = new Date();
+      return (
+        expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear()
+      );
+    })
+    .reduce((sum, expense) => sum + expense.amount, 0);
 
   const avgDailySpending = expenses.length > 0 ? totalExpenses / Math.max(1, expenses.length) : 0;
 
-  const navigationItems = [
-    { id: 'dashboard' as ActiveSection, label: 'Dashboard', icon: BarChart3 },
-    { id: 'quick-actions' as ActiveSection, label: 'Ações Rápidas', icon: Bolt },
-    { id: 'transactions' as ActiveSection, label: 'Transações', icon: RefreshCw },
-    { id: 'categories' as ActiveSection, label: 'Categorias', icon: Target },
-    { id: 'accounts' as ActiveSection, label: 'Contas', icon: Building2 },
-    { id: 'credit-cards' as ActiveSection, label: 'Cartões', icon: CreditCard },
-    { id: 'investments' as ActiveSection, label: 'Investimentos', icon: TrendingUp },
-    { id: 'loans' as ActiveSection, label: 'Empréstimos', icon: Banknote },
-    { id: 'banking' as ActiveSection, label: 'Open Finance', icon: Zap },
-    { id: 'insights' as ActiveSection, label: 'Insights IA', icon: Target },
-    { id: 'analytics' as ActiveSection, label: 'Análises', icon: BarChart3 },
-    { id: 'notifications' as ActiveSection, label: 'Notificações', icon: Bell },
+  const highlightItems = [
+    {
+      icon: TrendingUp,
+      title: 'Insights preditivos',
+      description: 'Antecipe movimentos de fluxo de caixa com análises guiadas por IA.',
+      accent: 'linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(20, 184, 166, 0.15))',
+    },
+    {
+      icon: Brain,
+      title: 'IA que entende você',
+      description: 'Sugestões contextuais baseadas em hábitos e metas do seu perfil.',
+      accent: 'linear-gradient(135deg, rgba(34, 211, 238, 0.25), rgba(56, 189, 248, 0.1))',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Segurança multicamada',
+      description: 'Conexões Open Finance com monitoramento contínuo e proteção reforçada.',
+      accent: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(99, 102, 241, 0.1))',
+    },
+    {
+      icon: Bolt,
+      title: 'Automação em minutos',
+      description: 'Ações rápidas para organizar despesas, contas e notificações.',
+      accent: 'linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(249, 115, 22, 0.1))',
+    },
   ];
 
-  const renderMainContent = () => {
-    switch (activeSection) {
-      case 'dashboard':
-        return <FinancialDashboard expenses={expenses} />;
-      case 'transactions':
-        return (
-          <div className="space-y-8">
-            <ExpenseTracker 
-              expenses={expenses} 
-              onAddExpense={handleAddExpense} 
-              loading={submitting} 
-            />
-            <TransactionManager />
-          </div>
-        );
-      case 'categories':
-        return <TransactionCategoryManager />;
-      case 'accounts':
-        return <AccountManager />;
-      case 'banking':
-        return <PluggyManager />;
-      case 'credit-cards':
-        return <CreditCardManager />;
-      case 'investments':
-        return <InvestmentManager />;
-      case 'loans':
-        return <LoanManager />;
-      case 'insights':
-        return <AIInsights refreshKey={refreshInsights} />;
-      case 'analytics':
-        return <ExpenseGraphs expenses={expenses} />;
-      case 'notifications':
-        return <NotificationCenter />;
-      case 'quick-actions':
-        return <QuickActions />;
-      default:
-        return <FinancialDashboard expenses={expenses} />;
-    }
+  const overlayConfig: Record<OverlayView, {
+    title: string;
+    description: string;
+    icon: LucideIcon;
+    render: () => JSX.Element;
+  }> = {
+    dashboard: {
+      title: 'Painel financeiro completo',
+      description: 'Visualize sua saúde financeira com KPIs, projeções e status consolidado.',
+      icon: BarChart3,
+      render: () => <FinancialDashboard expenses={expenses} />,
+    },
+    'expense-tracker': {
+      title: 'Rastreamento de gastos',
+      description: 'Cadastre despesas, categorize rapidamente e acompanhe tendências em tempo real.',
+      icon: Wallet,
+      render: () => (
+        <ExpenseTracker
+          expenses={expenses}
+          onAddExpense={handleAddExpense}
+          loading={submitting}
+        />
+      ),
+    },
+    transactions: {
+      title: 'Gestão de transações',
+      description: 'Revise lançamentos, filtre por categorias e mantenha seu histórico organizado.',
+      icon: Target,
+      render: () => (
+        <div className="space-y-6">
+          <TransactionManager />
+        </div>
+      ),
+    },
+    categories: {
+      title: 'Categorias personalizadas',
+      description: 'Estruture categorias e subcategorias para uma análise precisa.',
+      icon: Target,
+      render: () => <TransactionCategoryManager />,
+    },
+    accounts: {
+      title: 'Contas conectadas',
+      description: 'Gerencie instituições, sincronizações e saldos dentro do Open Finance.',
+      icon: Building2,
+      render: () => <AccountManager />,
+    },
+    banking: {
+      title: 'Integrações Open Finance',
+      description: 'Configure conexões com bancos e cartões por meio da infraestrutura Pluggy.',
+      icon: Zap,
+      render: () => <PluggyManager />,
+    },
+    'credit-cards': {
+      title: 'Gestão de cartões',
+      description: 'Acompanhe limites, faturas e benefícios em um hub visual.',
+      icon: CreditCard,
+      render: () => <CreditCardManager />,
+    },
+    investments: {
+      title: 'Carteira de investimentos',
+      description: 'Mapeie aplicações, acompanhe rentabilidade e tendências de mercado.',
+      icon: TrendingUp,
+      render: () => <InvestmentManager />,
+    },
+    loans: {
+      title: 'Gestão de empréstimos',
+      description: 'Centralize parcelas, juros e prazos para planejar seus pagamentos.',
+      icon: Banknote,
+      render: () => <LoanManager />,
+    },
+    insights: {
+      title: 'Insights de IA',
+      description: 'Receba análises e recomendações inteligentes baseadas nos seus dados.',
+      icon: Sparkles,
+      render: () => <AIInsights refreshKey={refreshInsights} />,
+    },
+    analytics: {
+      title: 'Análises e gráficos',
+      description: 'Explore dashboards visualmente ricos para entender padrões de gasto.',
+      icon: BarChart3,
+      render: () => <ExpenseGraphs expenses={expenses} />,
+    },
+    notifications: {
+      title: 'Central de notificações',
+      description: 'Configure alertas, acompanhe lembretes e mantenha o controle em dia.',
+      icon: Bell,
+      render: () => <NotificationCenter />,
+    },
+    'quick-actions': {
+      title: 'Ações rápidas',
+      description: 'Acelere tarefas frequentes com atalhos inteligentes.',
+      icon: Bolt,
+      render: () => <QuickActions />,
+    },
   };
 
+  const activeOverlayConfig = activeOverlay ? overlayConfig[activeOverlay] : null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 paper-texture">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-2xl shadow-lg">
-                <Wallet className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                  Financeito
-                </h1>
-                <p className="text-gray-600">Gerenciador completo de finanças pessoais com IA</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setRefreshInsights(prev => prev + 1)}
-                className="flex items-center gap-2 px-4 py-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors"
-              >
-                <RefreshCw className="w-5 h-5" />
-                <span className="hidden sm:inline">Atualizar Insights</span>
-              </button>
-              <AuthButton />
-            </div>
-          </div>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/2 top-[-10%] h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl" aria-hidden="true" />
+        <div className="absolute right-[-10%] bottom-0 h-[520px] w-[520px] rounded-full bg-cyan-500/20 blur-3xl" aria-hidden="true" />
+        <div className="bg-grid" aria-hidden="true" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation Tabs */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-2 mb-8">
-          <div className="flex flex-wrap gap-2">
-            {navigationItems.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveSection(id)}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${
-                  activeSection === id
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
-                    : 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-24 px-4 pb-24 sm:px-6 lg:px-8">
+        <HeroSection
+          userName={user?.name}
+          onRefreshInsights={() => setRefreshInsights(prev => prev + 1)}
+          onOpenOverlay={setActiveOverlay}
+          thisMonthExpenses={thisMonthExpenses}
+          totalExpenses={totalExpenses}
+        />
 
-        {/* Stats Cards - Only show on dashboard and transactions */}
-        {(activeSection === 'dashboard' || activeSection === 'transactions') && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-xl">
-                  <Wallet className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total em Gastos</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(totalExpenses)}
-                  </p>
-                </div>
-              </div>
-            </div>
+        <FeatureHighlights items={highlightItems} />
 
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-xl">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Este Mês</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(thisMonthExpenses)}
-                  </p>
-                </div>
-              </div>
-            </div>
+        <FinancePreviewSection
+          expenses={expenses}
+          thisMonthExpenses={thisMonthExpenses}
+          totalExpenses={totalExpenses}
+          avgDailySpending={avgDailySpending}
+          onOpenOverlay={setActiveOverlay}
+        />
 
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-xl">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Média por Gasto</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(avgDailySpending)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content Area */}
-        <div className="mb-8">
-          {renderMainContent()}
-        </div>
+        <CallToActionSection onOpenOverlay={setActiveOverlay} />
       </div>
+
+      {activeOverlayConfig && (
+        <ExperienceOverlay
+          open={Boolean(activeOverlay)}
+          onClose={() => setActiveOverlay(null)}
+          title={activeOverlayConfig.title}
+          description={activeOverlayConfig.description}
+          icon={activeOverlayConfig.icon}
+        >
+          {activeOverlayConfig.render()}
+        </ExperienceOverlay>
+      )}
     </div>
   );
 }
