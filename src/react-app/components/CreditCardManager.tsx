@@ -13,6 +13,7 @@ import {
   AlertCircle,
   FileText,
 } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { CreditCard as CreditCardType, CreateCreditCard } from '@/shared/types';
 import CreditCardBillManager from './CreditCardBillManager';
 import {
@@ -60,7 +61,7 @@ export default function CreditCardManager() {
   const fetchCards = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/credit-cards');
+      const response = await apiFetch('/api/credit-cards');
       const data = await response.json();
       setCards(data.creditCards || []);
     } catch (error) {
@@ -72,7 +73,7 @@ export default function CreditCardManager() {
 
   const fetchAvailableAccounts = async () => {
     try {
-      const response = await fetch('/api/credit-cards/available-accounts');
+      const response = await apiFetch('/api/credit-cards/available-accounts');
       const data = await response.json();
       setAvailableAccounts(data.accounts || []);
     } catch (error) {
@@ -104,7 +105,7 @@ export default function CreditCardManager() {
       const url = editingCard ? `/api/credit-cards/${editingCard.id}` : '/api/credit-cards';
       const method = editingCard ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -136,7 +137,7 @@ export default function CreditCardManager() {
     if (!confirm('Tem certeza que deseja excluir este cartão?')) return;
 
     try {
-      const response = await fetch(`/api/credit-cards/${id}`, {
+      const response = await apiFetch(`/api/credit-cards/${id}`, {
         method: 'DELETE',
       });
 
@@ -158,7 +159,7 @@ export default function CreditCardManager() {
     if (!confirm('Tem certeza que deseja desvincular este cartão?')) return;
 
     try {
-      const response = await fetch(`/api/credit-cards/${cardId}/link`, {
+      const response = await apiFetch(`/api/credit-cards/${cardId}/link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId: null }),
@@ -177,7 +178,7 @@ export default function CreditCardManager() {
     if (!linkingCard) return;
 
     try {
-      const response = await fetch(`/api/credit-cards/${linkingCard.id}/link`, {
+      const response = await apiFetch(`/api/credit-cards/${linkingCard.id}/link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId }),
@@ -197,7 +198,7 @@ export default function CreditCardManager() {
   const handleSyncCard = async (cardId: number) => {
     try {
       setSyncingCard(cardId);
-      const response = await fetch(`/api/credit-cards/${cardId}/sync`, {
+      const response = await apiFetch(`/api/credit-cards/${cardId}/sync`, {
         method: 'POST',
       });
 

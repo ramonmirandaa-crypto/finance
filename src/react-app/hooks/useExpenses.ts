@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '@/react-app/utils/api';
 import type { CreateExpense, Expense } from '@/shared/types';
 
 interface UseExpensesOptions {
@@ -21,7 +22,7 @@ interface UseExpensesResult {
 }
 
 async function fetchExpensesFromApi(): Promise<Expense[]> {
-  const response = await fetch('/api/expenses');
+  const response = await apiFetch('/api/expenses');
 
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
@@ -83,7 +84,7 @@ export function useExpenses({ enabled }: UseExpensesOptions): UseExpensesResult 
     setError(null);
 
     try {
-      const response = await fetch('/api/expenses', {
+      const response = await apiFetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expenseData),

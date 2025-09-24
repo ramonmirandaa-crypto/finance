@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Wallet, TrendingUp, CreditCard as CreditCardIcon, Banknote, Target, DollarSign } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { Expense, CreditCard, Investment, Loan, CreditCardBill } from '@/shared/types';
 
 interface FinancialDashboardProps {
@@ -29,10 +30,10 @@ export default function FinancialDashboard({ expenses }: FinancialDashboardProps
     try {
       setLoading(true);
       const [cardsRes, investmentsRes, loansRes, billsRes] = await Promise.all([
-        fetch('/api/credit-cards'),
-        fetch('/api/investments'),
-        fetch('/api/loans'),
-        fetch('/api/credit-card-bills')
+        apiFetch('/api/credit-cards'),
+        apiFetch('/api/investments'),
+        apiFetch('/api/loans'),
+        apiFetch('/api/credit-card-bills')
       ]);
 
       const [cardsData, investmentsData, loansData, billsData] = await Promise.all([

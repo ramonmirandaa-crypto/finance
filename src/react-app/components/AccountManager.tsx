@@ -13,6 +13,7 @@ import {
   EyeOff,
   Check,
 } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { Account, CreateAccount } from '@/shared/types';
 import {
   bankOptionsForForm,
@@ -63,7 +64,7 @@ export default function AccountManager() {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/accounts');
+      const response = await apiFetch('/api/accounts');
       const data = await response.json();
       setAccounts(data.accounts || []);
     } catch (error) {
@@ -98,7 +99,7 @@ export default function AccountManager() {
       const url = editingAccount ? `/api/accounts/${editingAccount.id}` : '/api/accounts';
       const method = editingAccount ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -132,7 +133,7 @@ export default function AccountManager() {
     if (!confirm('Tem certeza que deseja excluir esta conta?')) return;
 
     try {
-      const response = await fetch(`/api/accounts/${id}`, {
+      const response = await apiFetch(`/api/accounts/${id}`, {
         method: 'DELETE',
       });
 
@@ -147,7 +148,7 @@ export default function AccountManager() {
   const syncPluggyAccounts = async () => {
     try {
       setSyncingAccounts(new Set([...Array(accounts.length).keys()]));
-      const response = await fetch('/api/accounts/sync-pluggy', {
+      const response = await apiFetch('/api/accounts/sync-pluggy', {
         method: 'POST',
       });
       
