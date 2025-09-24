@@ -55,7 +55,7 @@ export default function AuthButton() {
   }
 
   return (
-    <SignInButton mode="modal" afterSignInUrl="/" afterSignUpUrl="/">
+    <SignInButton mode="modal" forceRedirectUrl="/" signUpForceRedirectUrl="/">
       <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl">
         <GoogleIcon />
         Entrar ou criar conta

@@ -2,7 +2,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createClerkClient, type RequestState } from '@clerk/backend';
+import { createClerkClient, type ClerkClient } from '@clerk/backend';
 import prisma from './prismaClient';
 
 type TransactionType = 'income' | 'expense' | 'transfer';
@@ -36,7 +36,9 @@ interface Env {
   PLUGGY_CLIENT_SECRET: string;
 }
 
-const app = new Hono<{ Bindings: Env; Variables: { auth: RequestState; userId: string } }>();
+type AuthRequestState = Awaited<ReturnType<ClerkClient['authenticateRequest']>>;
+
+const app = new Hono<{ Bindings: Env; Variables: { auth: AuthRequestState; userId: string } }>();
 
 const clerkClientCache = new Map<string, ReturnType<typeof createClerkClient>>();
 
@@ -86,9 +88,10 @@ const getUserId = (c: any): string | null => {
       return userId;
     }
 
-    const authState = c.get?.('auth') as RequestState | undefined;
-    if (authState?.userId) {
-      return authState.userId;
+    const authState = c.get?.('auth') as AuthRequestState | undefined;
+    const auth = authState?.toAuth();
+    if (auth?.userId) {
+      return auth.userId;
     }
   } catch (error) {
     console.warn('Failed to resolve user from context:', error);
@@ -98,23 +101,22 @@ const getUserId = (c: any): string | null => {
   return legacyUserId || null;
 };
 
-const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: { auth: RequestState; userId: string } }> = async (
+const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: { auth: AuthRequestState; userId: string } }> = async (
   c,
   next,
 ) => {
   try {
     const clerkClient = getClerkClient(c.env);
-    const requestState = await clerkClient.authenticateRequest({
-      request: c.req.raw,
-      loadSession: true,
-    });
+    const requestState = await clerkClient.authenticateRequest(c.req.raw);
+    const auth = requestState.toAuth();
+    const userId = auth?.userId;
 
-    if (!requestState.isSignedIn || !requestState.userId) {
+    if (!requestState.isSignedIn || !userId) {
       return errorResponse('Unauthorized', 401);
     }
 
     c.set('auth', requestState);
-    c.set('userId', requestState.userId);
+    c.set('userId', userId);
 
     await next();
   } catch (error) {
@@ -355,8 +357,8 @@ app.delete('/api/expenses/:id', authMiddleware, async (c) => {
 // ===========================================
 
 app.get('/api/users/me', authMiddleware, async (c) => {
-  const authState = c.get('auth') as RequestState | undefined;
-  const userId = authState?.userId;
+  const authState = c.get('auth') as AuthRequestState | undefined;
+  const userId = authState?.toAuth()?.userId ?? null;
 
   if (!userId) {
     return errorResponse('Unauthorized', 401);
