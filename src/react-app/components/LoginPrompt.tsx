@@ -52,7 +52,7 @@ export default function LoginPrompt() {
             </div>
           </div>
 
-          <SignInButton mode="modal" afterSignInUrl="/" afterSignUpUrl="/">
+          <SignInButton mode="modal" forceRedirectUrl="/" signUpForceRedirectUrl="/">
             <button className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl">
               <GoogleIcon />
               Entrar ou criar conta
