@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Wallet,
@@ -69,7 +69,7 @@ interface OverlayConfigEntry {
   title: string;
   description: string;
   icon: LucideIcon;
-  render: () => JSX.Element;
+  render: () => ReactNode;
 }
 
 export type OverlayConfig = Record<OverlayView, OverlayConfigEntry>;
