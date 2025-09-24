@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { createClerkClient, type ClerkClient } from '@clerk/backend';
 import prisma from './prismaClient';
+import { PluggyClient, mapPluggyCategory } from './pluggy-improved';
 
 type TransactionType = 'income' | 'expense' | 'transfer';
 type StringFilter = { contains: string; mode: 'insensitive' };
@@ -1752,8 +1753,6 @@ app.post('/api/pluggy/test-connection', authMiddleware, async (c) => {
       return errorResponse('Client ID and Client Secret are required', 400);
     }
 
-    // Import the PluggyClient
-    const { PluggyClient } = await import('./pluggy-improved.js');
     const client = new PluggyClient(clientId.trim(), clientSecret.trim());
     
     // Test the connection by trying to authenticate
@@ -1792,8 +1791,6 @@ app.post('/api/pluggy/add-connection', authMiddleware, async (c) => {
       return errorResponse('Pluggy credentials not configured', 400);
     }
 
-    // Import and create Pluggy client
-    const { PluggyClient } = await import('./pluggy-improved.js');
     const client = new PluggyClient(clientIdResult.config_value as string, clientSecretResult.config_value as string);
     
     // Get item details from Pluggy
@@ -1878,9 +1875,8 @@ app.post('/api/pluggy/sync/:itemId?', authMiddleware, async (c) => {
       }, { status: 400 });
     }
 
-    // Import and create Pluggy client
+    // Create Pluggy client
     console.log(`[${syncId}] Creating Pluggy client`);
-    const { PluggyClient, mapPluggyCategory } = await import('./pluggy-improved.js');
     const client = new PluggyClient(clientIdResult.config_value as string, clientSecretResult.config_value as string);
     
     let connectionsToSync;
