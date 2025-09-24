@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Plus, CreditCard, Edit, Trash2, Calendar, DollarSign, Link, RefreshCw, Unlink, CheckCircle, AlertCircle, FileText } from 'lucide-react';
+import {
+  Plus,
+  CreditCard,
+  Edit,
+  Trash2,
+  Calendar,
+  DollarSign,
+  Link,
+  RefreshCw,
+  Unlink,
+  CheckCircle,
+  AlertCircle,
+  FileText,
+} from 'lucide-react';
 import { CreditCard as CreditCardType, CreateCreditCard } from '@/shared/types';
 import CreditCardBillManager from './CreditCardBillManager';
+import {
+  getCardNetworkVisual,
+  getCardVisualConfig,
+} from '@/react-app/components/brand/FinancialBrandAssets';
 
 interface ExtendedCreditCard extends CreditCardType {
   linked_account_id?: number;
@@ -446,7 +463,7 @@ export default function CreditCardManager() {
         )}
 
         {/* Cards List */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {cards.length === 0 ? (
             <div className="text-center py-12">
               <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -455,185 +472,231 @@ export default function CreditCardManager() {
             </div>
           ) : (
             cards.map((card) => {
-              const currentBalance = card.linked_account_balance ? Math.abs(card.linked_account_balance) : card.current_balance;
+              const currentBalance = card.linked_account_balance
+                ? Math.abs(card.linked_account_balance)
+                : card.current_balance;
               const creditLimit = card.linked_credit_limit || card.credit_limit;
+              const availableCredit = card.linked_available_credit
+                ? card.linked_available_credit
+                : creditLimit - currentBalance;
               const utilizationPercent = getUtilizationPercentage(currentBalance, creditLimit);
-              return (
-                <div
-                  key={card.id}
-                  className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="w-8 h-8 text-blue-600" />
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-gray-900">{card.name}</h3>
-                          {card.linked_account_id ? (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                              <CheckCircle className="w-3 h-3" />
-                              Pluggy
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                              <AlertCircle className="w-3 h-3" />
-                              Manual
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          <span>Vence dia {card.due_day}</span>
-                          {card.linked_account_name && (
-                            <>
-                              <span>•</span>
-                              <span className="text-green-600">{card.linked_account_name}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {card.linked_account_id ? (
-                        <>
-                          <button
-                            onClick={() => handleSyncCard(card.id)}
-                            disabled={syncingCard === card.id}
-                            className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-50"
-                            title="Sincronizar dados do Pluggy"
-                          >
-                            <RefreshCw className={`w-4 h-4 ${syncingCard === card.id ? 'animate-spin' : ''}`} />
-                          </button>
-                          <button
-                            onClick={() => handleUnlinkCard(card.id)}
-                            className="p-2 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
-                            title="Desvincular conta Pluggy"
-                          >
-                            <Unlink className="w-4 h-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleLinkCard(card)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                          title="Vincular com conta Pluggy"
-                        >
-                          <Link className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleEdit(card)}
-                        className="p-2 text-blue-600 hover:bg-blue-200 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(card.id)}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+              const cardVisual = getCardVisualConfig(card.name || card.linked_account_name);
+              const networkVisual = getCardNetworkVisual(card.name, cardVisual.defaultNetwork);
+              const IssuerLogo = cardVisual.issuerLogo;
+              const NetworkLogo = networkVisual.logo;
+              const isDarkCard = cardVisual.accent.includes('text-white');
+              const mutedText = isDarkCard ? 'text-white/70' : 'text-slate-600';
+              const statusBadgeClass = card.linked_account_id
+                ? isDarkCard
+                  ? 'border border-emerald-200/50 bg-emerald-400/20 text-emerald-100'
+                  : 'border border-emerald-200 bg-emerald-100 text-emerald-700'
+                : isDarkCard
+                  ? 'border border-white/30 bg-white/15 text-white/90'
+                  : 'border border-slate-200 bg-slate-100 text-slate-700';
+              const actionButtonClass = isDarkCard
+                ? 'rounded-full bg-white/15 p-2 text-white transition hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80'
+                : 'rounded-full bg-slate-900/10 p-2 text-slate-900 transition hover:bg-slate-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-600/40';
+              const highlightBadgeClass = isDarkCard
+                ? 'border border-white/25 bg-white/15 text-white'
+                : 'border border-slate-200 bg-white/80 text-slate-900';
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="w-5 h-5 text-green-600" />
-                        <span className="text-sm font-medium text-gray-600">Limite Total</span>
+              return (
+                <div key={card.id} className="rounded-4xl border border-slate-100 bg-white/90 p-6 shadow-xl">
+                  <article
+                    className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${cardVisual.gradient} ${cardVisual.accent} p-6 shadow-2xl`}
+                  >
+                    <div className="absolute inset-0">
+                      <div
+                        className={`absolute -top-16 -right-12 h-40 w-40 rounded-full bg-gradient-to-br ${cardVisual.patternColor} opacity-70 blur-3xl`}
+                        aria-hidden="true"
+                      />
+                      <div
+                        className={`absolute -bottom-20 left-[-10%] h-48 w-48 rounded-full bg-gradient-to-br ${cardVisual.highlightGradient} opacity-60 blur-3xl`}
+                        aria-hidden="true"
+                      />
+                    </div>
+
+                    <div className="relative flex flex-col gap-6">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-4">
+                          <IssuerLogo className={`h-7 ${isDarkCard ? 'text-white' : 'text-slate-900'}`} />
+                          <div
+                            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.3em] ${statusBadgeClass}`}
+                          >
+                            {card.linked_account_id ? (
+                              <>
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                Sincronizado
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                Manual
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-3">
+                          <NetworkLogo className={`h-6 ${isDarkCard ? 'text-white' : 'text-slate-900'}`} />
+                          <div className="flex items-center gap-2">
+                            {card.linked_account_id ? (
+                              <>
+                                <button
+                                  onClick={() => handleSyncCard(card.id)}
+                                  disabled={syncingCard === card.id}
+                                  className={`${actionButtonClass} disabled:opacity-50`}
+                                  title="Sincronizar dados do Pluggy"
+                                >
+                                  <RefreshCw className={`h-4 w-4 ${syncingCard === card.id ? 'animate-spin' : ''}`} />
+                                </button>
+                                <button
+                                  onClick={() => handleUnlinkCard(card.id)}
+                                  className={actionButtonClass}
+                                  title="Desvincular conta Pluggy"
+                                >
+                                  <Unlink className="h-4 w-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handleLinkCard(card)}
+                                className={actionButtonClass}
+                                title="Vincular com conta Pluggy"
+                              >
+                                <Link className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button onClick={() => handleEdit(card)} className={actionButtonClass} title="Editar cartão">
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleDelete(card.id)} className={actionButtonClass} title="Excluir cartão">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
+
+                      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <p className={`text-xs uppercase tracking-[0.35em] ${mutedText}`}>Fatura atual</p>
+                          <p className="mt-2 text-3xl font-semibold">
+                            {formatCurrency(currentBalance)}
+                          </p>
+                        </div>
+                        <div
+                          className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium ${highlightBadgeClass}`}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Vence dia {card.due_day}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 text-sm sm:grid-cols-3">
+                        <div>
+                          <p className={`text-[0.7rem] uppercase tracking-[0.3em] ${mutedText}`}>Limite total</p>
+                          <p className="mt-2 text-lg font-semibold">
+                            {formatCurrency(card.linked_credit_limit || card.credit_limit)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-[0.7rem] uppercase tracking-[0.3em] ${mutedText}`}>Saldo atual</p>
+                          <p className="mt-2 text-lg font-semibold">{formatCurrency(currentBalance)}</p>
+                        </div>
+                        <div>
+                          <p className={`text-[0.7rem] uppercase tracking-[0.3em] ${mutedText}`}>Disponível</p>
+                          <p className="mt-2 text-lg font-semibold">{formatCurrency(Math.max(0, availableCredit))}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className={`text-[0.7rem] uppercase tracking-[0.3em] ${mutedText}`}>Cartão</p>
+                        <p className="mt-2 text-base font-semibold">{card.name}</p>
+                        {card.linked_account_name ? (
+                          <p className={`text-xs ${mutedText}`}>Integrado com {card.linked_account_name}</p>
+                        ) : (
+                          <p className={`text-xs ${mutedText}`}>Cadastro manual</p>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                        <DollarSign className="h-4 w-4 text-emerald-500" />
+                        Limite total
+                      </div>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">
                         {formatCurrency(card.linked_credit_limit || card.credit_limit)}
                       </p>
                       {card.linked_credit_limit && card.linked_credit_limit !== card.credit_limit && (
-                        <p className="text-xs text-green-600">
-                          (Sincronizado: {formatCurrency(card.linked_credit_limit)})
+                        <p className="mt-1 text-xs text-emerald-600">
+                          Sincronizado: {formatCurrency(card.linked_credit_limit)}
                         </p>
                       )}
                     </div>
-
-                    <div className="bg-white rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="w-5 h-5 text-red-600" />
-                        <span className="text-sm font-medium text-gray-600">Saldo Atual</span>
+                    <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                        <DollarSign className="h-4 w-4 text-rose-500" />
+                        Saldo atual
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
-                        {formatCurrency(card.linked_account_balance ? Math.abs(card.linked_account_balance) : card.current_balance)}
-                      </p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">{formatCurrency(currentBalance)}</p>
                       {card.linked_account_balance && Math.abs(card.linked_account_balance) !== card.current_balance && (
-                        <p className="text-xs text-red-600">
-                          (Sincronizado: {formatCurrency(Math.abs(card.linked_account_balance))})
+                        <p className="mt-1 text-xs text-rose-500">
+                          Sincronizado: {formatCurrency(Math.abs(card.linked_account_balance))}
                         </p>
                       )}
                     </div>
-
-                    <div className="bg-white rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="w-5 h-5 text-blue-600" />
-                        <span className="text-sm font-medium text-gray-600">Limite Disponível</span>
+                    <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                        <DollarSign className="h-4 w-4 text-blue-500" />
+                        Disponível
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
-                        {card.linked_available_credit ? 
-                          formatCurrency(card.linked_available_credit) :
-                          formatCurrency((card.linked_credit_limit || card.credit_limit) - (card.linked_account_balance ? Math.abs(card.linked_account_balance) : card.current_balance))
-                        }
+                      <p className="mt-2 text-xl font-semibold text-slate-900">
+                        {formatCurrency(Math.max(0, availableCredit))}
                       </p>
                       {card.linked_available_credit && (
-                        <p className="text-xs text-blue-600">
-                          (Pluggy: {formatCurrency(card.linked_available_credit)})
+                        <p className="mt-1 text-xs text-blue-600">
+                          Pluggy: {formatCurrency(card.linked_available_credit)}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Pluggy Sync Status */}
                   {card.linked_account_id && (
-                    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-800">
-                            Vinculado com {card.linked_account_name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {card.linked_minimum_payment && (
-                            <span className="text-xs text-green-700">
-                              Pagamento mín: {formatCurrency(card.linked_minimum_payment)}
-                            </span>
-                          )}
-                          {card.linked_due_date && (
-                            <span className="text-xs text-green-700">
-                              Vence: {new Date(card.linked_due_date).toLocaleDateString('pt-BR')}
-                            </span>
-                          )}
-                        </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-700">
+                      <div className="flex items-center gap-2 font-medium">
+                        <CheckCircle className="h-4 w-4" /> Vinculado com {card.linked_account_name}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs">
+                        {card.linked_minimum_payment && (
+                          <span>Pagamento mín.: {formatCurrency(card.linked_minimum_payment)}</span>
+                        )}
+                        {card.linked_due_date && (
+                          <span>Vence: {new Date(card.linked_due_date).toLocaleDateString('pt-BR')}</span>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Utilization Bar */}
                   <div className="mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Utilização do Limite</span>
-                      <span className={`text-sm font-bold px-2 py-1 rounded-full ${getUtilizationColor(utilizationPercent)}`}>
+                    <div className="flex items-center justify-between text-sm font-medium text-slate-600">
+                      <span>Utilização do limite</span>
+                      <span className={`rounded-full px-3 py-1 ${getUtilizationColor(utilizationPercent)}`}>
                         {utilizationPercent.toFixed(1)}%
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
                       <div
                         className={`h-2 rounded-full transition-all ${
-                          utilizationPercent >= 80 ? 'bg-red-500' :
-                          utilizationPercent >= 60 ? 'bg-yellow-500' : 'bg-green-500'
+                          utilizationPercent >= 80 ? 'bg-red-500' : utilizationPercent >= 60 ? 'bg-yellow-500' : 'bg-green-500'
                         }`}
                         style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
-                      ></div>
+                      />
                     </div>
                     {card.linked_account_id && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Dados sincronizados automaticamente do Pluggy
-                      </p>
+                      <p className="mt-2 text-xs text-slate-500">Dados sincronizados automaticamente do Pluggy</p>
                     )}
                   </div>
                 </div>

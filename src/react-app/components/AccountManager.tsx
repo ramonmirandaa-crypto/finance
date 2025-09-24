@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Plus, Building2, CreditCard, Wallet, TrendingUp, Banknote, Edit, Trash2, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import {
+  Plus,
+  Building2,
+  CreditCard,
+  Wallet,
+  TrendingUp,
+  Banknote,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Check,
+} from 'lucide-react';
 import { Account, CreateAccount } from '@/shared/types';
+import {
+  bankOptionsForForm,
+  getBankVisualConfig,
+} from '@/react-app/components/brand/FinancialBrandAssets';
 
 const ACCOUNT_TYPE_ICONS = {
   checking: Wallet,
@@ -317,6 +334,46 @@ export default function AccountManager() {
                 />
               </div>
 
+              <div className="md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">Escolha uma instituição</p>
+                  <span className="text-xs uppercase tracking-[0.3em] text-gray-400">Opcional</span>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {bankOptionsForForm.map(option => {
+                    const Logo = option.logo;
+                    const isSelected = option.keywords.some(keyword =>
+                      formData.institution_name?.toLowerCase().includes(keyword)
+                    );
+
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, institution_name: option.label }))}
+                        className={`group relative flex flex-col items-center gap-3 rounded-2xl border px-3 py-3 transition ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/60'
+                        }`}
+                      >
+                        <span
+                          className={`flex h-16 w-full items-center justify-center rounded-2xl bg-gradient-to-br ${option.badgeGradient} text-white shadow-inner`}
+                        >
+                          <Logo className="h-8 text-white" />
+                        </span>
+                        <span className="text-sm font-medium text-gray-700">{option.label}</span>
+                        {isSelected && (
+                          <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Saldo Inicial
@@ -369,7 +426,7 @@ export default function AccountManager() {
         )}
 
         {/* Accounts List */}
-        <div className="space-y-4">
+        <div className="space-y-5">
           {accounts.length === 0 ? (
             <div className="text-center py-12">
               <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -379,32 +436,54 @@ export default function AccountManager() {
           ) : (
             accounts.map((account) => {
               const Icon = ACCOUNT_TYPE_ICONS[account.account_type];
-              const colorClass = ACCOUNT_TYPE_COLORS[account.account_type];
+              const bankVisual = getBankVisualConfig(
+                account.institution_name || account.marketing_name || account.name
+              );
+              const BankLogo = bankVisual.logo;
+              const hasCustomBank = bankVisual.id !== 'default';
+              const institutionDisplay = account.institution_name || (hasCustomBank ? bankVisual.label : null);
               return (
                 <div
                   key={account.id}
-                  className={`bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 ${
+                  className={`rounded-4xl border border-slate-200 bg-white/90 p-6 shadow-lg transition ${
                     account.is_active ? '' : 'opacity-60'
                   }`}
                 >
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`bg-gradient-to-br ${colorClass} p-3 rounded-xl`}>
-                          <Icon className="w-6 h-6 text-white" />
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div className="flex items-center justify-center">
+                          {hasCustomBank ? (
+                            <span
+                              className={`flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br ${bankVisual.badgeGradient} text-white shadow-inner`}
+                            >
+                              <BankLogo className="h-9 text-white" />
+                            </span>
+                          ) : (
+                            <span
+                              className={`flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br ${ACCOUNT_TYPE_COLORS[account.account_type]} text-white shadow-inner`}
+                            >
+                              <Icon className="h-7 w-7 text-white" />
+                            </span>
+                          )}
                         </div>
                         <div>
-                          <h3 className="font-bold text-gray-900">{account.name}</h3>
+                          <h3 className="text-lg font-semibold text-gray-900">{account.name}</h3>
                           {account.marketing_name && account.marketing_name !== account.name && (
                             <p className="text-sm text-blue-600">{account.marketing_name}</p>
                           )}
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
                             <span>{ACCOUNT_TYPE_LABELS[account.account_type]}</span>
-                            {account.institution_name && (
-                              <span>• {account.institution_name}</span>
+                            {institutionDisplay && (
+                              <>
+                                <span className="text-gray-400">•</span>
+                                <span className="font-medium text-gray-700">{institutionDisplay}</span>
+                              </>
                             )}
                             {account.pluggy_account_id && (
-                              <span className="text-green-600">• Pluggy conectado</span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-600">
+                                <Check className="h-3.5 w-3.5" /> Pluggy conectado
+                              </span>
                             )}
                           </div>
                           {account.number && (
@@ -415,7 +494,7 @@ export default function AccountManager() {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className="text-xl font-bold text-gray-900">
@@ -427,7 +506,7 @@ export default function AccountManager() {
                             </p>
                           )}
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleEdit(account)}
