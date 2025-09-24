@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { AIInsight } from '@/shared/types';
 
 interface AIInsightsProps {
-  refresh: boolean;
+  refreshKey: number;
 }
 
 const COLORS = [
@@ -12,7 +12,7 @@ const COLORS = [
   '#6366F1', '#EC4899', '#84CC16', '#F97316', '#6B7280'
 ];
 
-export default function AIInsights({ refresh }: AIInsightsProps) {
+export default function AIInsights({ refreshKey }: AIInsightsProps) {
   const [insight, setInsight] = useState<AIInsight | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +49,7 @@ export default function AIInsights({ refresh }: AIInsightsProps) {
 
   useEffect(() => {
     fetchInsights();
-  }, [refresh]);
+  }, [refreshKey]);
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {

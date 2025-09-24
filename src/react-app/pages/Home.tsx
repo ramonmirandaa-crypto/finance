@@ -143,7 +143,7 @@ export default function Home() {
       case 'loans':
         return <LoanManager />;
       case 'insights':
-        return <AIInsights refresh={refreshInsights > 0} />;
+        return <AIInsights refreshKey={refreshInsights} />;
       case 'analytics':
         return <ExpenseGraphs expenses={expenses} />;
       case 'notifications':
