@@ -44,7 +44,7 @@ export default function ExperienceOverlay({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
       <div
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
         aria-hidden="true"
         onClick={onClose}
       />
@@ -52,14 +52,14 @@ export default function ExperienceOverlay({
         role="dialog"
         aria-modal
         aria-labelledby="experience-overlay-title"
-        className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-2xl glass-surface"
+        className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-2xl"
       >
-        <div className="absolute -top-40 -left-32 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl" aria-hidden="true" />
-        <div className="absolute -bottom-32 -right-20 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" aria-hidden="true" />
+        <div className="absolute -top-40 -left-32 h-80 w-80 rounded-full bg-emerald-100 blur-3xl" aria-hidden="true" />
+        <div className="absolute -bottom-32 -right-20 h-72 w-72 rounded-full bg-cyan-100 blur-3xl" aria-hidden="true" />
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-6 top-6 rounded-full border border-white/10 bg-white/10 p-2 text-white transition hover:bg-white/20"
+          className="absolute right-6 top-6 rounded-full border border-emerald-100 bg-white p-2 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700"
           aria-label="Fechar visualização"
         >
           <X className="h-5 w-5" />
@@ -69,16 +69,16 @@ export default function ExperienceOverlay({
           <div className="flex flex-col gap-4 pr-12 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-4">
               {Icon && (
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 via-sky-500 to-blue-600 text-white shadow-lg">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-400 to-sky-500 text-white shadow-lg">
                   <Icon className="h-6 w-6" />
                 </span>
               )}
               <div>
-                <h2 id="experience-overlay-title" className="text-2xl font-semibold text-white">
+                <h2 id="experience-overlay-title" className="text-2xl font-semibold text-slate-900">
                   {title}
                 </h2>
                 {description && (
-                  <p className="mt-2 max-w-2xl text-sm text-slate-200/80">
+                  <p className="mt-2 max-w-2xl text-sm text-slate-600">
                     {description}
                   </p>
                 )}

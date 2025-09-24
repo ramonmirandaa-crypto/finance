@@ -93,16 +93,16 @@ export default function FinancePreviewSection({
 
   return (
     <section className="relative mt-24" aria-labelledby="finance-preview">
-      <div className="absolute inset-0 -z-10 rounded-[3rem] bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-transparent" aria-hidden="true" />
+      <div className="absolute inset-0 -z-10 rounded-[3rem] bg-gradient-to-br from-emerald-100 via-cyan-50 to-transparent" aria-hidden="true" />
       <div className="flex flex-col gap-12 text-left">
         <div className="flex flex-col gap-4">
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-emerald-500/10 px-4 py-1 text-xs font-medium uppercase tracking-[0.2em] text-emerald-200/90">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1 text-xs font-medium uppercase tracking-[0.2em] text-emerald-600">
             Visualização Imersiva
           </span>
-          <h2 id="finance-preview" className="max-w-3xl text-3xl font-semibold text-white sm:text-4xl">
+          <h2 id="finance-preview" className="max-w-3xl text-3xl font-semibold text-slate-900 sm:text-4xl">
             Explore camadas de dados, dashboards e integrações sem sair do fluxo
           </h2>
-          <p className="max-w-2xl text-base text-slate-200/80">
+          <p className="max-w-2xl text-base text-slate-600">
             Visualize tendências, abra painéis completos e conecte instituições com uma experiência fluida, inspirada em interfaces imersivas.
           </p>
         </div>
@@ -111,28 +111,28 @@ export default function FinancePreviewSection({
           {previewCards.map(({ id, title, description, icon: Icon, highlight, detail }) => (
             <article
               key={id}
-              className="group relative overflow-hidden rounded-4xl border border-white/10 bg-slate-900/60 p-8 shadow-2xl backdrop-blur-xl transition-transform hover:-translate-y-1 hover:shadow-3xl glass-surface"
+              className="group relative overflow-hidden rounded-4xl border border-emerald-100 bg-white p-8 shadow-xl transition-transform hover:-translate-y-1 hover:shadow-2xl"
             >
-              <div className="absolute -top-32 right-0 h-72 w-72 rounded-full bg-emerald-500/20 opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true" />
+              <div className="absolute -top-32 right-0 h-72 w-72 rounded-full bg-emerald-100 opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true" />
               <div className="relative flex flex-col gap-6">
                 <div className="flex items-center gap-4">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700">
                     <Icon className="h-6 w-6" />
                   </span>
                   <div>
-                    <h3 className="text-2xl font-semibold text-white">{title}</h3>
-                    <p className="mt-1 text-sm text-emerald-200/80">{highlight}</p>
+                    <h3 className="text-2xl font-semibold text-slate-900">{title}</h3>
+                    <p className="mt-1 text-sm text-emerald-600">{highlight}</p>
                   </div>
                 </div>
-                <p className="text-base text-slate-200/80">{description}</p>
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100/80">
+                <p className="text-base text-slate-600">{description}</p>
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm text-slate-600">
                   {detail}
                 </div>
                 <div>
                   <button
                     type="button"
                     onClick={() => onOpenOverlay(id)}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500/20"
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-5 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
                   >
                     Abrir experiência
                     <ArrowUpRight className="h-4 w-4" />
@@ -143,15 +143,15 @@ export default function FinancePreviewSection({
           ))}
         </div>
 
-        <div className="rounded-4xl border border-white/10 bg-white/5 p-6 text-left shadow-xl backdrop-blur-xl glass-surface">
+        <div className="rounded-4xl border border-emerald-100 bg-white p-6 text-left shadow-xl">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-white">Outras ferramentas disponíveis</h3>
-              <p className="text-sm text-slate-200/70">
+              <h3 className="text-lg font-semibold text-slate-900">Outras ferramentas disponíveis</h3>
+              <p className="text-sm text-slate-600">
                 Abra painéis completos ou fluxos específicos com um clique.
               </p>
             </div>
-            <div className="rounded-full border border-white/10 bg-emerald-500/20 px-4 py-1 text-xs font-medium uppercase tracking-[0.3em] text-emerald-200/90">
+            <div className="rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1 text-xs font-medium uppercase tracking-[0.3em] text-emerald-600">
               +{Math.max(0, quickLinks.length - 4)} experiências
             </div>
           </div>
@@ -161,15 +161,15 @@ export default function FinancePreviewSection({
                 key={id}
                 type="button"
                 onClick={() => onOpenOverlay(id)}
-                className="group flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/40 px-4 py-3 text-left text-sm font-medium text-slate-100/80 transition hover:bg-emerald-500/10 hover:text-white"
+                className="group flex items-center justify-between gap-3 rounded-3xl border border-emerald-100 bg-white px-4 py-3 text-left text-sm font-medium text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700">
                     <Icon className="h-4 w-4" />
                   </span>
                   {label}
                 </span>
-                <ArrowUpRight className="h-4 w-4 opacity-0 transition group-hover:opacity-100" />
+                <ArrowUpRight className="h-4 w-4 text-emerald-500 opacity-0 transition group-hover:opacity-100" />
               </button>
             ))}
           </div>

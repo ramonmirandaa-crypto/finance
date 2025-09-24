@@ -77,17 +77,17 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-emerald-50 via-white to-white text-slate-900">
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div
-          className="absolute left-1/2 top-[-10%] h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl"
+          className="absolute left-1/2 top-[-20%] h-[540px] w-[540px] -translate-x-1/2 rounded-full bg-emerald-200/40 blur-3xl"
           aria-hidden="true"
         />
         <div
-          className="absolute right-[-10%] bottom-0 h-[520px] w-[520px] rounded-full bg-cyan-500/20 blur-3xl"
+          className="absolute right-[-15%] bottom-[-10%] h-[520px] w-[520px] rounded-full bg-cyan-200/40 blur-3xl"
           aria-hidden="true"
         />
-        <div className="bg-grid" aria-hidden="true" />
+        <div className="bg-grid opacity-50" aria-hidden="true" />
       </div>
 
       <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-24 px-4 pb-24 sm:px-6 lg:px-8">
