@@ -50,6 +50,7 @@
   },
   "scripts": {
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/postbuild.js",
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "vite",
