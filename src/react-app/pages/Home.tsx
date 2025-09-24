@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { useAuth } from '@getmocha/users-service/react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -43,6 +43,14 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [refreshInsights, setRefreshInsights] = useState(0);
   const [activeOverlay, setActiveOverlay] = useState<OverlayView | null>(null);
+
+  const googleUserName =
+    user?.google_user_data?.name ??
+    [user?.google_user_data?.given_name, user?.google_user_data?.family_name]
+      .filter((part): part is string => Boolean(part))
+      .join(' ')
+      .trim();
+  const userName = googleUserName || user?.email || null;
 
   const fetchExpenses = async () => {
     try {
@@ -243,7 +251,7 @@ export default function Home() {
 
       <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-24 px-4 pb-24 sm:px-6 lg:px-8">
         <HeroSection
-          userName={user?.name}
+          userName={userName}
           onRefreshInsights={() => setRefreshInsights(prev => prev + 1)}
           onOpenOverlay={setActiveOverlay}
           thisMonthExpenses={thisMonthExpenses}

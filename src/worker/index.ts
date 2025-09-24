@@ -2,8 +2,30 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { Prisma, TransactionType } from '@prisma/client';
 import prisma from './prismaClient';
+
+type TransactionType = 'income' | 'expense' | 'transfer';
+type StringFilter = { contains: string; mode: 'insensitive' };
+type AmountFilter = { gte?: number; lte?: number };
+type DateFilter = { gte?: Date; lte?: Date };
+type NumericValue = number | { toNumber: () => number };
+type AnalyticsBucket = { totalAmount: number; transactionCount: number };
+type AnalyticsTransaction = {
+  amount: NumericValue;
+  category: string | null;
+  merchant_name: string | null;
+  date: Date;
+};
+type TransactionWhere = {
+  user_id: string;
+  account_id?: number;
+  category?: string;
+  transaction_type?: TransactionType;
+  description?: StringFilter;
+  merchant_name?: StringFilter;
+  amount?: AmountFilter;
+  date?: DateFilter;
+};
 import {
   exchangeCodeForSessionToken,
   getOAuthRedirectUrl,
@@ -735,7 +757,7 @@ app.get('/api/transactions', authMiddleware, async (c) => {
     const pageSize = Math.min(Math.max(parseInt(c.req.query('pageSize') ?? '20', 10), 1), 100);
     const skip = (page - 1) * pageSize;
 
-    const where: Prisma.TransactionWhereInput = { user_id: userId };
+    const where: TransactionWhere = { user_id: userId };
 
     const accountId = c.req.query('accountId');
     if (accountId) {
@@ -765,7 +787,7 @@ app.get('/api/transactions', authMiddleware, async (c) => {
       where.merchant_name = { contains: merchantName, mode: 'insensitive' };
     }
 
-    const amountFilter: Prisma.DecimalFilter = {};
+    const amountFilter: AmountFilter = {};
     const amountGte = c.req.query('amountGte');
     if (amountGte) {
       const parsed = Number(amountGte);
@@ -784,7 +806,7 @@ app.get('/api/transactions', authMiddleware, async (c) => {
       where.amount = amountFilter;
     }
 
-    const dateFilter: Prisma.DateTimeFilter = {};
+    const dateFilter: DateFilter = {};
     const from = c.req.query('from');
     if (from) {
       const parsed = new Date(from);
@@ -803,7 +825,7 @@ app.get('/api/transactions', authMiddleware, async (c) => {
       where.date = dateFilter;
     }
 
-    const [transactions, total] = await Promise.all([
+    const [transactionRecords, total] = await Promise.all([
       prisma.transaction.findMany({
         where,
         include: {
@@ -817,11 +839,11 @@ app.get('/api/transactions', authMiddleware, async (c) => {
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         skip,
         take: pageSize,
-      }),
-      prisma.transaction.count({ where }),
+      }) as Promise<Array<Record<string, unknown>>>,
+      prisma.transaction.count({ where }) as Promise<number>,
     ]);
 
-    const items = transactions.map((transaction) => formatTransaction(transaction));
+    const items = transactionRecords.map(transaction => formatTransaction(transaction));
 
     return Response.json({
       transactions: items,
@@ -847,7 +869,7 @@ app.get('/api/transactions/analytics', authMiddleware, async (c) => {
   }
 
   try {
-    const where: Prisma.TransactionWhereInput = { user_id: userId };
+    const where: TransactionWhere = { user_id: userId };
 
     const accountId = c.req.query('accountId');
     if (accountId) {
@@ -859,7 +881,7 @@ app.get('/api/transactions/analytics', authMiddleware, async (c) => {
 
     const from = c.req.query('from');
     const to = c.req.query('to');
-    const dateFilter: Prisma.DateTimeFilter = {};
+    const dateFilter: DateFilter = {};
     if (from) {
       const parsed = new Date(from);
       if (!Number.isNaN(parsed.getTime())) {
@@ -876,7 +898,7 @@ app.get('/api/transactions/analytics', authMiddleware, async (c) => {
       where.date = dateFilter;
     }
 
-    const transactions = await prisma.transaction.findMany({
+    const transactions = (await prisma.transaction.findMany({
       where,
       select: {
         amount: true,
@@ -884,13 +906,13 @@ app.get('/api/transactions/analytics', authMiddleware, async (c) => {
         merchant_name: true,
         date: true,
       },
-    });
+    })) as AnalyticsTransaction[];
 
     const totals = transactions.reduce(
       (acc, transaction) => {
         const amount = typeof transaction.amount === 'number'
           ? transaction.amount
-          : (transaction.amount as unknown as { toNumber: () => number }).toNumber();
+          : transaction.amount.toNumber();
 
         acc.totalAmount += amount;
         acc.totalTransactions += 1;
@@ -924,27 +946,36 @@ app.get('/api/transactions/analytics', authMiddleware, async (c) => {
       {
         totalTransactions: 0,
         totalAmount: 0,
-        categoryBreakdown: {} as Record<string, { totalAmount: number; transactionCount: number }>,
-        monthlyTrends: {} as Record<string, { totalAmount: number; transactionCount: number }>,
-        topMerchants: {} as Record<string, { totalAmount: number; transactionCount: number }>,
+        categoryBreakdown: {} as Record<string, AnalyticsBucket>,
+        monthlyTrends: {} as Record<string, AnalyticsBucket>,
+        topMerchants: {} as Record<string, AnalyticsBucket>,
       },
     );
 
     const averageAmount = totals.totalTransactions > 0 ? totals.totalAmount / totals.totalTransactions : 0;
 
-    const categoryBreakdown = Object.entries(totals.categoryBreakdown).map(([categoryKey, data]) => ({
+    const categoryBreakdown = (Object.entries(totals.categoryBreakdown) as Array<[
+      string,
+      AnalyticsBucket,
+    ]>).map(([categoryKey, data]) => ({
       category: categoryKey,
       totalAmount: data.totalAmount,
       transactionCount: data.transactionCount,
       percentage: totals.totalAmount > 0 ? (data.totalAmount * 100) / totals.totalAmount : 0,
     }));
 
-    const monthlyTrends = Object.entries(totals.monthlyTrends)
+    const monthlyTrends = (Object.entries(totals.monthlyTrends) as Array<[
+      string,
+      AnalyticsBucket,
+    ]>)
       .map(([month, data]) => ({ month, totalAmount: data.totalAmount, transactionCount: data.transactionCount }))
       .sort((a, b) => (a.month < b.month ? 1 : -1))
       .slice(0, 12);
 
-    const topMerchants = Object.entries(totals.topMerchants)
+    const topMerchants = (Object.entries(totals.topMerchants) as Array<[
+      string,
+      AnalyticsBucket,
+    ]>)
       .map(([merchant, data]) => ({ merchant_name: merchant, totalAmount: data.totalAmount, transactionCount: data.transactionCount }))
       .sort((a, b) => b.totalAmount - a.totalAmount)
       .slice(0, 10);
@@ -1037,10 +1068,10 @@ app.put('/api/transactions/:id', authMiddleware, async (c) => {
     const updates = await c.req.json();
     const allowedFields = ['description', 'category', 'merchant_name', 'notes', 'reconciled'] as const;
 
-    const data: Prisma.TransactionUpdateManyMutationInput = {};
+    const data: { [key: string]: unknown } = {};
     for (const field of allowedFields) {
       if (field in updates) {
-        (data as Record<string, unknown>)[field] = updates[field];
+        data[field] = updates[field];
       }
     }
 
@@ -1285,7 +1316,7 @@ app.get('/api/budgets', authMiddleware, async (c) => {
   }
 
   try {
-    const budgets = await prisma.budget.findMany({
+    const budgets = (await prisma.budget.findMany({
       where: { user_id: userId },
       include: {
         account: {
@@ -1295,9 +1326,9 @@ app.get('/api/budgets', authMiddleware, async (c) => {
         },
       },
       orderBy: [{ period_start: 'desc' }, { created_at: 'desc' }],
-    });
+    })) as Array<Record<string, unknown>>;
 
-    return Response.json({ budgets: budgets.map((budget) => formatBudget(budget)) });
+    return Response.json({ budgets: budgets.map(budget => formatBudget(budget)) });
   } catch (error) {
     console.error('Error fetching budgets:', error);
     return errorResponse('Failed to fetch budgets', 500);
@@ -1369,7 +1400,7 @@ app.put('/api/budgets/:id', authMiddleware, async (c) => {
 
   try {
     const updates = await c.req.json();
-    const data: Prisma.BudgetUpdateManyMutationInput = {};
+    const data: { [key: string]: unknown } = {};
 
     if (typeof updates.name === 'string') {
       data.name = updates.name.trim();
@@ -1478,7 +1509,7 @@ app.get('/api/goals', authMiddleware, async (c) => {
   }
 
   try {
-    const goals = await prisma.goal.findMany({
+    const goals = (await prisma.goal.findMany({
       where: { user_id: userId },
       include: {
         account: {
@@ -1488,9 +1519,9 @@ app.get('/api/goals', authMiddleware, async (c) => {
         },
       },
       orderBy: [{ target_date: 'asc' }, { created_at: 'desc' }],
-    });
+    })) as Array<Record<string, unknown>>;
 
-    return Response.json({ goals: goals.map((goal) => formatGoal(goal)) });
+    return Response.json({ goals: goals.map(goal => formatGoal(goal)) });
   } catch (error) {
     console.error('Error fetching goals:', error);
     return errorResponse('Failed to fetch goals', 500);
@@ -1556,7 +1587,7 @@ app.put('/api/goals/:id', authMiddleware, async (c) => {
 
   try {
     const updates = await c.req.json();
-    const data: Prisma.GoalUpdateManyMutationInput = {};
+    const data: { [key: string]: unknown } = {};
 
     if (typeof updates.title === 'string') {
       data.title = updates.title.trim();
