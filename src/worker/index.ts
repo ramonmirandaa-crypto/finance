@@ -1,7 +1,8 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { createClerkClient, type RequestState } from '@clerk/backend';
 import prisma from './prismaClient';
 
 type TransactionType = 'income' | 'expense' | 'transfer';
@@ -26,26 +27,35 @@ type TransactionWhere = {
   amount?: AmountFilter;
   date?: DateFilter;
 };
-import {
-  exchangeCodeForSessionToken,
-  getOAuthRedirectUrl,
-  authMiddleware,
-  deleteSession,
-  MOCHA_SESSION_TOKEN_COOKIE_NAME,
-} from "@getmocha/users-service/backend";
-import { getCookie, setCookie } from "hono/cookie";
-
 // Define Env interface locally for the worker
 interface Env {
   DB: D1Database;
   OPENAI_API_KEY: string;
-  MOCHA_USERS_SERVICE_API_URL: string;
-  MOCHA_USERS_SERVICE_API_KEY: string;
+  CLERK_SECRET_KEY: string;
   PLUGGY_CLIENT_ID: string;
   PLUGGY_CLIENT_SECRET: string;
 }
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: { auth: RequestState; userId: string } }>();
+
+const clerkClientCache = new Map<string, ReturnType<typeof createClerkClient>>();
+
+const getClerkClient = (env: Env) => {
+  const secretKey = env.CLERK_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new Error('Missing CLERK_SECRET_KEY environment variable');
+  }
+
+  const cachedClient = clerkClientCache.get(secretKey);
+  if (cachedClient) {
+    return cachedClient;
+  }
+
+  const client = createClerkClient({ secretKey });
+  clerkClientCache.set(secretKey, client);
+  return client;
+};
 
 // Enhanced CORS configuration
 app.use('*', cors({
@@ -70,15 +80,47 @@ const errorResponse = (message: string, status = 400) => {
 
 // Get authenticated user ID from request headers or auth middleware
 const getUserId = (c: any): string | null => {
-  // First try to get from auth middleware (preferred)
-  const user = c.get('user');
-  if (user) {
-    return user.id;
+  try {
+    const userId = c.get?.('userId') as string | undefined;
+    if (userId) {
+      return userId;
+    }
+
+    const authState = c.get?.('auth') as RequestState | undefined;
+    if (authState?.userId) {
+      return authState.userId;
+    }
+  } catch (error) {
+    console.warn('Failed to resolve user from context:', error);
   }
 
-  // Fallback to header-based auth (legacy)
-  const userId = c.req.header('X-User-ID') || c.req.header('x-user-id');
-  return userId || null;
+  const legacyUserId = c.req.header('X-User-ID') || c.req.header('x-user-id');
+  return legacyUserId || null;
+};
+
+const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: { auth: RequestState; userId: string } }> = async (
+  c,
+  next,
+) => {
+  try {
+    const clerkClient = getClerkClient(c.env);
+    const requestState = await clerkClient.authenticateRequest({
+      request: c.req.raw,
+      loadSession: true,
+    });
+
+    if (!requestState.isSignedIn || !requestState.userId) {
+      return errorResponse('Unauthorized', 401);
+    }
+
+    c.set('auth', requestState);
+    c.set('userId', requestState.userId);
+
+    await next();
+  } catch (error) {
+    console.error('Clerk authentication error:', error);
+    return errorResponse('Unauthorized', 401);
+  }
 };
 
 const normalizePrismaValue = (value: unknown): any => {
@@ -309,84 +351,32 @@ app.delete('/api/expenses/:id', authMiddleware, async (c) => {
 });
 
 // ===========================================
-// AUTHENTICATION ROUTES
+// USER PROFILE ROUTES
 // ===========================================
 
-// Get OAuth redirect URL
-app.get('/api/oauth/google/redirect_url', async (c) => {
-  try {
-    const redirectUrl = await getOAuthRedirectUrl('google', {
-      apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-      apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
-    });
+app.get('/api/users/me', authMiddleware, async (c) => {
+  const authState = c.get('auth') as RequestState | undefined;
+  const userId = authState?.userId;
 
-    return Response.json({ redirectUrl });
-  } catch (error) {
-    console.error('Error getting OAuth redirect URL:', error);
-    return errorResponse('Failed to get redirect URL', 500);
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
   }
-});
 
-// Exchange code for session token
-app.post("/api/sessions", async (c) => {
   try {
-    const body = await c.req.json();
+    const clerkClient = getClerkClient(c.env);
+    const user = await clerkClient.users.getUser(userId);
 
-    if (!body.code) {
-      return errorResponse('No authorization code provided', 400);
-    }
-
-    const sessionToken = await exchangeCodeForSessionToken(body.code, {
-      apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-      apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
+    return Response.json({
+      id: user.id,
+      fullName: user.fullName,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      emailAddress: user.primaryEmailAddress?.emailAddress ?? null,
+      imageUrl: user.imageUrl,
     });
-
-    setCookie(c, MOCHA_SESSION_TOKEN_COOKIE_NAME, sessionToken, {
-      httpOnly: true,
-      path: "/",
-      sameSite: "none",
-      secure: true,
-      maxAge: 60 * 24 * 60 * 60, // 60 days
-    });
-
-    return Response.json({ success: true });
   } catch (error) {
-    console.error('Error exchanging code for session token:', error);
-    return errorResponse('Failed to authenticate', 500);
-  }
-});
-
-// Get current user
-app.get("/api/users/me", authMiddleware, async (c) => {
-  const user = c.get("user");
-  return Response.json(user);
-});
-
-// Logout
-app.get('/api/logout', async (c) => {
-  try {
-    const sessionToken = getCookie(c, MOCHA_SESSION_TOKEN_COOKIE_NAME);
-
-    if (typeof sessionToken === 'string') {
-      await deleteSession(sessionToken, {
-        apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-        apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
-      });
-    }
-
-    // Delete cookie by setting max age to 0
-    setCookie(c, MOCHA_SESSION_TOKEN_COOKIE_NAME, '', {
-      httpOnly: true,
-      path: '/',
-      sameSite: 'none',
-      secure: true,
-      maxAge: 0,
-    });
-
-    return Response.json({ success: true });
-  } catch (error) {
-    console.error('Error during logout:', error);
-    return errorResponse('Failed to logout', 500);
+    console.error('Error fetching authenticated user:', error);
+    return errorResponse('Failed to load user profile', 500);
   }
 });
 

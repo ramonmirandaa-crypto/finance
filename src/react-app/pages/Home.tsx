@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useAuth } from '@getmocha/users-service/react';
+import { useUser } from '@clerk/clerk-react';
 import FeatureHighlights from '@/react-app/components/sections/FeatureHighlights';
 import HeroSection from '@/react-app/components/sections/HeroSection';
 import FinancePreviewSection, { OverlayView } from '@/react-app/components/sections/FinancePreviewSection';
@@ -11,19 +11,24 @@ import { HIGHLIGHT_ITEMS, buildOverlayConfig } from './homeConfig';
 import type { CreateExpense } from '@/shared/types';
 
 export default function Home() {
-  const { user, isPending } = useAuth();
+  const { user, isLoaded, isSignedIn } = useUser();
   const [refreshInsights, setRefreshInsights] = useState(0);
   const [activeOverlay, setActiveOverlay] = useState<OverlayView | null>(null);
 
-  const googleUserName =
-    user?.google_user_data?.name ??
-    [user?.google_user_data?.given_name, user?.google_user_data?.family_name]
-      .filter((part): part is string => Boolean(part))
-      .join(' ')
-      .trim();
-  const userName = googleUserName || user?.email || null;
+  const userName = useMemo(() => {
+    if (!user) {
+      return null;
+    }
 
-  const { expenses, submitting, metrics, addExpense } = useExpenses({ enabled: Boolean(user) });
+    const fullName = user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    if (fullName) {
+      return fullName;
+    }
+
+    return user.primaryEmailAddress?.emailAddress ?? null;
+  }, [user]);
+
+  const { expenses, submitting, metrics, addExpense } = useExpenses({ enabled: Boolean(user && isSignedIn) });
   const { totalExpenses, thisMonthExpenses, avgDailySpending } = metrics;
 
   const handleRefreshInsights = useCallback(() => {
@@ -62,7 +67,7 @@ export default function Home() {
 
   const activeOverlayConfig = activeOverlay ? overlayConfig[activeOverlay] : null;
 
-  if (isPending) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="animate-pulse">
@@ -72,7 +77,7 @@ export default function Home() {
     );
   }
 
-  if (!user) {
+  if (!isSignedIn || !user) {
     return <LoginPrompt />;
   }
 
