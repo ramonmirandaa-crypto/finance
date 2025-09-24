@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Tag, Hash, Save, X } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 
 interface TransactionCategory {
   id: number;
@@ -46,7 +47,7 @@ export default function TransactionCategoryManager() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/transaction-categories', {
+      const response = await apiFetch('/api/transaction-categories', {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -72,7 +73,7 @@ export default function TransactionCategoryManager() {
   // Create category
   const createCategory = async () => {
     try {
-      const response = await fetch('/api/transaction-categories', {
+      const response = await apiFetch('/api/transaction-categories', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +97,7 @@ export default function TransactionCategoryManager() {
     if (!editingCategory) return;
 
     try {
-      const response = await fetch(`/api/transaction-categories/${editingCategory.id}`, {
+      const response = await apiFetch(`/api/transaction-categories/${editingCategory.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -120,7 +121,7 @@ export default function TransactionCategoryManager() {
     if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
 
     try {
-      const response = await fetch(`/api/transaction-categories/${id}`, {
+      const response = await apiFetch(`/api/transaction-categories/${id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }

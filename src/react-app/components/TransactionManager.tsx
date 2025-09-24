@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Filter, CheckSquare, Calendar, DollarSign, CreditCard, TrendingUp, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 
 interface Transaction {
   id: number;
@@ -105,7 +106,7 @@ export default function TransactionManager() {
       params.append('page', currentPage.toString());
       params.append('pageSize', '50');
 
-      const response = await fetch(`/api/transactions?${params.toString()}`, {
+      const response = await apiFetch(`/api/transactions?${params.toString()}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
@@ -137,7 +138,7 @@ export default function TransactionManager() {
       if (filters.from) params.append('from', filters.from);
       if (filters.to) params.append('to', filters.to);
 
-      const response = await fetch(`/api/transactions/analytics?${params.toString()}`, {
+      const response = await apiFetch(`/api/transactions/analytics?${params.toString()}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
@@ -171,7 +172,7 @@ export default function TransactionManager() {
 
     try {
       setBulkOperating(true);
-      const response = await fetch('/api/transactions/bulk', {
+      const response = await apiFetch('/api/transactions/bulk', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -199,7 +200,7 @@ export default function TransactionManager() {
   // Auto-categorize transaction
   const autoCategorizeTransaction = async (transactionId: number) => {
     try {
-      const response = await fetch(`/api/transactions/${transactionId}/categorize`, {
+      const response = await apiFetch(`/api/transactions/${transactionId}/categorize`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -219,7 +220,7 @@ export default function TransactionManager() {
   // Update transaction
   const updateTransaction = async (id: number, updates: Partial<Transaction>) => {
     try {
-      const response = await fetch(`/api/transactions/${id}`, {
+      const response = await apiFetch(`/api/transactions/${id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -243,7 +244,7 @@ export default function TransactionManager() {
     if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
 
     try {
-      const response = await fetch(`/api/transactions/${id}`, {
+      const response = await apiFetch(`/api/transactions/${id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }

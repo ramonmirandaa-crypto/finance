@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, AlertCircle, CheckCircle, Clock, FileText, Eye, EyeOff, RefreshCw, Info } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { CreditCardBill, CreditCardTransaction } from '@/shared/types';
 import PluggyPermissionsInfo from './PluggyPermissionsInfo';
 
@@ -48,7 +49,7 @@ export default function CreditCardBillManager() {
   const fetchBills = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/credit-card-bills');
+      const response = await apiFetch('/api/credit-card-bills');
       const data = await response.json();
       setBills(data.bills || []);
     } catch (error) {
@@ -61,7 +62,7 @@ export default function CreditCardBillManager() {
   const fetchBillTransactions = async (billId: number) => {
     try {
       setLoadingTransactions(true);
-      const response = await fetch(`/api/credit-card-bills/${billId}/transactions`);
+      const response = await apiFetch(`/api/credit-card-bills/${billId}/transactions`);
       const data = await response.json();
       setBillTransactions(data.transactions || []);
     } catch (error) {
@@ -75,7 +76,7 @@ export default function CreditCardBillManager() {
   const syncFromPluggy = async () => {
     try {
       setSyncing(true);
-      const response = await fetch('/api/credit-card-bills/sync-pluggy', {
+      const response = await apiFetch('/api/credit-card-bills/sync-pluggy', {
         method: 'POST',
       });
       

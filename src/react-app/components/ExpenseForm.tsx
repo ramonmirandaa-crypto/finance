@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Sparkles } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { EXPENSE_CATEGORIES, CreateExpense } from '@/shared/types';
 
 interface ExpenseFormProps {
@@ -32,7 +33,7 @@ export default function ExpenseForm({ onSubmit, loading }: ExpenseFormProps) {
     
     setCategorizing(true);
     try {
-      const response = await fetch('/api/categorize', {
+      const response = await apiFetch('/api/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: expense.description }),

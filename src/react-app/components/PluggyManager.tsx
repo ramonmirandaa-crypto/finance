@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Settings, TestTube, RefreshCw, Trash2, CheckCircle, AlertCircle, Building2, Eye, EyeOff, Copy, ExternalLink, Info } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import PluggyPermissionsInfo from './PluggyPermissionsInfo';
 
 interface PluggyConfig {
@@ -51,7 +52,7 @@ export default function PluggyManager() {
   const fetchConnections = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/pluggy/connections');
+      const response = await apiFetch('/api/pluggy/connections');
       const data = await response.json();
       setConnections(data.connections || []);
     } catch (error) {
@@ -63,7 +64,7 @@ export default function PluggyManager() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('/api/pluggy/config');
+      const response = await apiFetch('/api/pluggy/config');
       if (response.ok) {
         const webhookResponse = await response.json();
         setConfig({
@@ -84,7 +85,7 @@ export default function PluggyManager() {
 
   const loadWebhookConfig = async () => {
     try {
-      const response = await fetch('/api/pluggy/webhook-config');
+      const response = await apiFetch('/api/pluggy/webhook-config');
       if (response.ok) {
         const webhookData = await response.json();
         if (webhookData.webhookUrl) {
@@ -113,7 +114,7 @@ export default function PluggyManager() {
     setSyncStatus({ isLoading: true, message: 'Configurando webhook...', error: null });
 
     try {
-      const response = await fetch('/api/pluggy/webhook-config', {
+      const response = await apiFetch('/api/pluggy/webhook-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookConfig)
@@ -158,7 +159,7 @@ export default function PluggyManager() {
     setSyncStatus({ isLoading: true, message: 'Testando webhook...', error: null });
 
     try {
-      const response = await fetch('/api/pluggy/test-webhook', {
+      const response = await apiFetch('/api/pluggy/test-webhook', {
         method: 'POST'
       });
 
@@ -190,7 +191,7 @@ export default function PluggyManager() {
 
   const loadWebhookLogs = async () => {
     try {
-      const response = await fetch('/api/pluggy/webhook-logs?limit=20');
+      const response = await apiFetch('/api/pluggy/webhook-logs?limit=20');
       if (response.ok) {
         const data = await response.json();
         setWebhookLogs(data.logs || []);
@@ -214,7 +215,7 @@ export default function PluggyManager() {
     setSyncStatus({ isLoading: false, message: '', error: null });
 
     try {
-      const response = await fetch('/api/pluggy/config', {
+      const response = await apiFetch('/api/pluggy/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -259,7 +260,7 @@ export default function PluggyManager() {
     setSyncStatus({ isLoading: true, message: 'Testando conexão com Pluggy...', error: null });
 
     try {
-      const response = await fetch('/api/pluggy/test-connection', {
+      const response = await apiFetch('/api/pluggy/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -304,7 +305,7 @@ export default function PluggyManager() {
     setSyncStatus({ isLoading: true, message: 'Adicionando conexão...', error: null });
 
     try {
-      const response = await fetch('/api/pluggy/add-connection', {
+      const response = await apiFetch('/api/pluggy/add-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId: newItemId.trim() })
@@ -348,7 +349,7 @@ export default function PluggyManager() {
       const endpoint = itemId ? `/api/pluggy/sync/${itemId}` : '/api/pluggy/sync';
       console.log(`[PluggyManager] Starting sync for endpoint: ${endpoint}`);
       
-      const response = await fetch(endpoint, { 
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -411,7 +412,7 @@ export default function PluggyManager() {
     if (!confirm('Tem certeza que deseja remover esta conexão?')) return;
 
     try {
-      const response = await fetch(`/api/pluggy/connections/${connectionId}`, {
+      const response = await apiFetch(`/api/pluggy/connections/${connectionId}`, {
         method: 'DELETE'
       });
 

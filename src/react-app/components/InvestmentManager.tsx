@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, TrendingUp, Edit, Trash2, Calendar, DollarSign, Percent } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { Investment, CreateInvestment, INVESTMENT_TYPES } from '@/shared/types';
 
 export default function InvestmentManager() {
@@ -19,7 +20,7 @@ export default function InvestmentManager() {
   const fetchInvestments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/investments');
+      const response = await apiFetch('/api/investments');
       const data = await response.json();
       setInvestments(data.investments || []);
     } catch (error) {
@@ -53,7 +54,7 @@ export default function InvestmentManager() {
       const url = editingInvestment ? `/api/investments/${editingInvestment.id}` : '/api/investments';
       const method = editingInvestment ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -86,7 +87,7 @@ export default function InvestmentManager() {
     if (!confirm('Tem certeza que deseja excluir este investimento?')) return;
 
     try {
-      const response = await fetch(`/api/investments/${id}`, {
+      const response = await apiFetch(`/api/investments/${id}`, {
         method: 'DELETE',
       });
 

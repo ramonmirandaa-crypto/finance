@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Brain, TrendingUp, TrendingDown, Minus, Lightbulb, Loader2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { apiFetch } from '@/react-app/utils/api';
 import { AIInsight } from '@/shared/types';
 
 interface AIInsightsProps {
@@ -19,7 +20,7 @@ export default function AIInsights({ refreshKey }: AIInsightsProps) {
   const fetchInsights = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/insights');
+      const response = await apiFetch('/api/insights');
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

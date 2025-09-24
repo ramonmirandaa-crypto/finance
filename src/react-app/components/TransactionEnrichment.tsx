@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Sparkles, Tag, FileText, AlertTriangle, TrendingUp, Zap, CheckCircle, XCircle } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 
 interface TransactionEnrichmentProps {
   transactionId: number;
@@ -39,7 +40,7 @@ export default function TransactionEnrichment({
       setEnriching(true);
       setError(null);
       
-      const response = await fetch(`/api/transactions/${transactionId}/enrich`, {
+      const response = await apiFetch(`/api/transactions/${transactionId}/enrich`, {
         method: 'POST'
       });
       

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Banknote, Edit, Trash2, Calendar, DollarSign, Percent, Zap } from 'lucide-react';
+import { apiFetch } from '@/react-app/utils/api';
 import { Loan, CreateLoan } from '@/shared/types';
 
 export default function LoanManager() {
@@ -22,7 +23,7 @@ export default function LoanManager() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/loans');
+      const response = await apiFetch('/api/loans');
       const data = await response.json();
       setLoans(data.loans || []);
     } catch (error) {
@@ -58,7 +59,7 @@ export default function LoanManager() {
       const url = editingLoan ? `/api/loans/${editingLoan.id}` : '/api/loans';
       const method = editingLoan ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -93,7 +94,7 @@ export default function LoanManager() {
     if (!confirm('Tem certeza que deseja excluir este empréstimo?')) return;
 
     try {
-      const response = await fetch(`/api/loans/${id}`, {
+      const response = await apiFetch(`/api/loans/${id}`, {
         method: 'DELETE',
       });
 
@@ -211,7 +212,7 @@ export default function LoanManager() {
             <button
               onClick={() => {
                 setSyncing(true);
-                fetch('/api/loans/sync', { method: 'POST' })
+                apiFetch('/api/loans/sync', { method: 'POST' })
                   .then(response => response.json())
                   .then(result => {
                     if (result.success) {
