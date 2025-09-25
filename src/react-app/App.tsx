@@ -1,10 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ClerkLoaded, ClerkLoading } from "@clerk/clerk-react";
 import HomePage from "@/react-app/pages/Home";
 
 export default function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <ClerkLoading>
         <div className="min-h-screen bg-slate-950 flex items-center justify-center">
           <div className="animate-pulse">
@@ -17,6 +17,6 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
         </Routes>
       </ClerkLoaded>
-    </Router>
+    </BrowserRouter>
   );
 }
