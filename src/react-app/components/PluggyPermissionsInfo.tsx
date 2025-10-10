@@ -108,9 +108,9 @@ export default function PluggyPermissionsInfo({ show, onClose }: PluggyPermissio
               <h3 className="font-semibold text-gray-900">Erros Comuns (Normal)</h3>
             </div>
             <div className="text-gray-700 space-y-2 text-sm font-mono bg-gray-100 p-3 rounded-lg">
-              <p>• 403 Forbidden - Credit card bills access denied</p>
-              <p>• 403 Forbidden - Additional permissions required</p>
-              <p>• Account access restricted for credit cards</p>
+              <p>• 403 Proibido - Acesso às faturas do cartão negado</p>
+              <p>• 403 Proibido - Permissões adicionais necessárias</p>
+              <p>• Acesso à conta restrito para cartões de crédito</p>
             </div>
             <p className="text-gray-600 text-sm mt-2">
               <strong>Importante:</strong> Esses erros são esperados e não indicam problema na configuração.
