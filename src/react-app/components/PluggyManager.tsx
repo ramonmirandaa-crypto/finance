@@ -530,7 +530,7 @@ export default function PluggyManager() {
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
           >
             <Settings className="w-5 h-5" />
-            API Config
+            Configuração da API
           </button>
           <button
             onClick={() => {
@@ -591,8 +591,8 @@ export default function PluggyManager() {
                 <h4 className="font-semibold text-blue-900 mb-2">📚 Como configurar:</h4>
                 <ol className="text-blue-800 space-y-1 text-sm">
                   <li>1. Acesse o <a href="https://dashboard.pluggy.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Dashboard do Pluggy</a></li>
-                  <li>2. Vá em "Settings" → "API Keys"</li>
-                  <li>3. Copie seu Client ID e Client Secret</li>
+                  <li>2. Vá em "Configurações" → "Chaves de API"</li>
+                  <li>3. Copie seu ID do Cliente (Client ID) e Segredo do Cliente (Client Secret)</li>
                   <li>4. Cole as credenciais abaixo</li>
                   <li>5. Teste a conexão antes de salvar</li>
                 </ol>
@@ -601,7 +601,7 @@ export default function PluggyManager() {
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Client ID
+                    ID do Cliente (Client ID)
                   </label>
                   <div className="relative">
                     <input
@@ -623,7 +623,7 @@ export default function PluggyManager() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Client Secret
+                    Segredo do Cliente (Client Secret)
                   </label>
                   <div className="relative">
                     <input

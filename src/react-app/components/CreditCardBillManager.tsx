@@ -120,7 +120,7 @@ export default function CreditCardBillManager() {
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return 'Indisponível';
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
